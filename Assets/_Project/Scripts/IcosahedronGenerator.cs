@@ -4,8 +4,8 @@ using UnityEngine;
 namespace LuckyNumbers.PhysicsPrototype
 {
     /// <summary>
-    /// Generates and manages the icosahedron geometry, visual mesh, exterior convex collider,
-    /// and the 20 seamless interior convex prism colliders.
+    /// Generates and manages the icosahedron (DnD d20) geometry, visual mesh, exterior convex collider,
+    /// 20 seamless interior convex prism colliders, edge frames, and face numbers.
     /// </summary>
     public class IcosahedronGenerator : MonoBehaviour
     {
@@ -16,7 +16,12 @@ namespace LuckyNumbers.PhysicsPrototype
         [Header("Materials")]
         [SerializeField] private Material interiorMaterial;
         [SerializeField] private Material exteriorMaterial;
+        [SerializeField] private Material edgeMaterial;
         [SerializeField] private PhysicsMaterial interiorPhysicMaterial;
+
+        [Header("DnD Visual Features")]
+        [SerializeField] private bool showDndNumbers = true;
+        [SerializeField] private bool showEdgeFrames = true;
 
         [Header("Layers")]
         [SerializeField] private string exteriorLayerName = "ExteriorShell";
@@ -28,9 +33,10 @@ namespace LuckyNumbers.PhysicsPrototype
 
         private void Awake()
         {
-            // Build geometry if not already populated in the scene
+            // Build geometry if not already populated or if DnD features are missing
             Transform interiorParent = transform.Find("InteriorColliders");
-            if (interiorParent == null || interiorParent.childCount == 0)
+            Transform dndNumbers = transform.Find("DndFaceNumbers");
+            if (interiorParent == null || interiorParent.childCount == 0 || dndNumbers == null)
             {
                 BuildIcosahedron();
             }
@@ -61,6 +67,12 @@ namespace LuckyNumbers.PhysicsPrototype
 
             // 7. Setup interior point light for clear visibility
             SetupInteriorLight();
+
+            // 8. Setup DnD edge frames (golden/dark inked edge lines)
+            SetupEdgeFrames(unitVertices, faces);
+
+            // 9. Setup DnD face numbers (1 to 20, opposite faces sum to 21)
+            SetupDndNumbers(unitVertices, faces);
         }
 
         private void SetupInteriorLight()
@@ -160,7 +172,6 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 normal = Vector3.Cross(v1 - v0, v2 - v0);
                 if (Vector3.Dot(normal, center) < 0f)
                 {
-                    // Swap winding order to make it outward
                     int temp = faces[i][1];
                     faces[i][1] = faces[i][2];
                     faces[i][2] = temp;
@@ -170,13 +181,11 @@ namespace LuckyNumbers.PhysicsPrototype
 
         private static void AlignBottomFace(Vector3[] unitVertices, int[][] faces)
         {
-            // Face 0 center
             Vector3 v0 = unitVertices[faces[0][0]];
             Vector3 v1 = unitVertices[faces[0][1]];
             Vector3 v2 = unitVertices[faces[0][2]];
             Vector3 faceCenter = ((v0 + v1 + v2) / 3f).normalized;
 
-            // Rotate so faceCenter points straight down (0, -1, 0)
             Quaternion alignment = Quaternion.FromToRotation(faceCenter, Vector3.down);
             for (int i = 0; i < unitVertices.Length; i++)
             {
@@ -201,7 +210,6 @@ namespace LuckyNumbers.PhysicsPrototype
             float rIn = innerRadius;
             float rOut = innerRadius + wallThickness;
 
-            // 20 interior faces (60 verts) + 20 exterior faces (60 verts)
             Vector3[] vertices = new Vector3[120];
             Vector3[] normals = new Vector3[120];
             Vector2[] uvs = new Vector2[120];
@@ -209,7 +217,7 @@ namespace LuckyNumbers.PhysicsPrototype
             int[] interiorIndices = new int[60];
             int[] exteriorIndices = new int[60];
 
-            // 1. Interior faces (winding CCW looking from inside, normals point inward)
+            // 1. Interior faces
             for (int f = 0; f < 20; f++)
             {
                 int baseVert = f * 3;
@@ -217,10 +225,8 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 p1 = unitVertices[faces[f][1]] * rIn;
                 Vector3 p2 = unitVertices[faces[f][2]] * rIn;
 
-                // Inward normal
                 Vector3 faceNormal = -Vector3.Cross(p1 - p0, p2 - p0).normalized;
 
-                // Winding order reversed (0, 2, 1) so it's visible from inside
                 vertices[baseVert + 0] = p0;
                 vertices[baseVert + 1] = p2;
                 vertices[baseVert + 2] = p1;
@@ -238,7 +244,7 @@ namespace LuckyNumbers.PhysicsPrototype
                 interiorIndices[f * 3 + 2] = baseVert + 2;
             }
 
-            // 2. Exterior faces (winding CCW looking from outside, normals point outward)
+            // 2. Exterior faces
             for (int f = 0; f < 20; f++)
             {
                 int baseVert = 60 + f * 3;
@@ -341,32 +347,24 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 u1 = unitVertices[faces[f][1]];
                 Vector3 u2 = unitVertices[faces[f][2]];
 
-                // Inner vertices form the playable boundary surface
                 Vector3 v0 = u0 * rIn;
                 Vector3 v1 = u1 * rIn;
                 Vector3 v2 = u2 * rIn;
 
-                // Outer vertices form the back of the triangular prism towards the shell
                 Vector3 v3 = u0 * rOut;
                 Vector3 v4 = u1 * rOut;
                 Vector3 v5 = u2 * rOut;
 
                 Vector3[] prismVerts = new Vector3[] { v0, v1, v2, v3, v4, v5 };
 
-                // 8 triangles forming a closed, watertight convex triangular prism
                 int[] prismTriangles = new int[]
                 {
-                    // Inner face
                     0, 2, 1,
-                    // Outer face
                     3, 4, 5,
-                    // Side 0-1
                     0, 1, 4,
                     0, 4, 3,
-                    // Side 1-2
                     1, 2, 5,
                     1, 5, 4,
-                    // Side 2-0
                     2, 0, 3,
                     2, 3, 5
                 };
@@ -386,6 +384,187 @@ namespace LuckyNumbers.PhysicsPrototype
                     mc.material = interiorPhysicMaterial;
                 }
             }
+        }
+
+        private void SetupEdgeFrames(Vector3[] unitVertices, int[][] faces)
+        {
+            if (!showEdgeFrames) return;
+
+            GameObject edgeObj = new GameObject("DndEdgeFrames");
+            edgeObj.transform.SetParent(transform, false);
+
+            float rOut = innerRadius + wallThickness + 0.01f;
+            float ribbonWidth = 0.12f;
+
+            HashSet<long> uniqueEdges = new HashSet<long>();
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector3> norms = new List<Vector3>();
+            List<int> tris = new List<int>();
+
+            for (int f = 0; f < 20; f++)
+            {
+                int[] face = faces[f];
+                for (int e = 0; e < 3; e++)
+                {
+                    int iA = face[e];
+                    int iB = face[(e + 1) % 3];
+                    int minI = Mathf.Min(iA, iB);
+                    int maxI = Mathf.Max(iA, iB);
+                    long key = ((long)minI << 32) | (uint)maxI;
+
+                    if (!uniqueEdges.Add(key)) continue;
+
+                    Vector3 pA = unitVertices[minI] * rOut;
+                    Vector3 pB = unitVertices[maxI] * rOut;
+                    Vector3 midNorm = ((unitVertices[minI] + unitVertices[maxI]) * 0.5f).normalized;
+                    Vector3 edgeDir = pB - pA;
+                    Vector3 sideDir = Vector3.Cross(edgeDir, midNorm).normalized * (ribbonWidth * 0.5f);
+
+                    int baseIdx = verts.Count;
+                    verts.Add(pA - sideDir);
+                    verts.Add(pA + sideDir);
+                    verts.Add(pB + sideDir);
+                    verts.Add(pB - sideDir);
+
+                    norms.Add(midNorm);
+                    norms.Add(midNorm);
+                    norms.Add(midNorm);
+                    norms.Add(midNorm);
+
+                    tris.Add(baseIdx + 0);
+                    tris.Add(baseIdx + 1);
+                    tris.Add(baseIdx + 2);
+
+                    tris.Add(baseIdx + 0);
+                    tris.Add(baseIdx + 2);
+                    tris.Add(baseIdx + 3);
+                }
+            }
+
+            Mesh edgeMesh = new Mesh();
+            edgeMesh.name = "DndEdgeMesh";
+            edgeMesh.vertices = verts.ToArray();
+            edgeMesh.normals = norms.ToArray();
+            edgeMesh.triangles = tris.ToArray();
+            edgeMesh.RecalculateBounds();
+
+            MeshFilter mf = edgeObj.AddComponent<MeshFilter>();
+            mf.sharedMesh = edgeMesh;
+
+            MeshRenderer mr = edgeObj.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = edgeMaterial != null ? edgeMaterial : exteriorMaterial;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        }
+
+        private void SetupDndNumbers(Vector3[] unitVertices, int[][] faces)
+        {
+            if (!showDndNumbers) return;
+
+            GameObject numbersParent = new GameObject("DndFaceNumbers");
+            numbersParent.transform.SetParent(transform, false);
+
+            float rOut = innerRadius + wallThickness + 0.03f;
+            int[] faceNumbers = AssignDndFaceNumbers(unitVertices, faces);
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            for (int f = 0; f < 20; f++)
+            {
+                int[] face = faces[f];
+                Vector3 u0 = unitVertices[face[0]];
+                Vector3 u1 = unitVertices[face[1]];
+                Vector3 u2 = unitVertices[face[2]];
+
+                Vector3 faceCenter = ((u0 + u1 + u2) / 3f).normalized;
+                Vector3 pos = faceCenter * rOut;
+
+                Vector3 vUp = u0 - faceCenter;
+                Vector3 projUp = Vector3.ProjectOnPlane(vUp, faceCenter).normalized;
+
+                GameObject numObj = new GameObject($"Number_{faceNumbers[f]}");
+                numObj.transform.SetParent(numbersParent.transform, false);
+                numObj.transform.localPosition = pos;
+                numObj.transform.localRotation = Quaternion.LookRotation(-faceCenter, projUp);
+
+                TextMesh tm = numObj.AddComponent<TextMesh>();
+                tm.text = faceNumbers[f].ToString();
+                tm.fontSize = 54;
+                tm.characterSize = 0.08f;
+                tm.alignment = TextAlignment.Center;
+                tm.anchor = TextAnchor.MiddleCenter;
+                tm.color = new Color(0.95f, 0.95f, 0.95f, 0.9f);
+                if (font != null) tm.font = font;
+
+                MeshRenderer mr = numObj.GetComponent<MeshRenderer>();
+                if (mr != null)
+                {
+                    mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                }
+            }
+        }
+
+        private int[] AssignDndFaceNumbers(Vector3[] unitVertices, int[][] faces)
+        {
+            int[] result = new int[20];
+            Vector3[] faceCenters = new Vector3[20];
+            for (int i = 0; i < 20; i++)
+            {
+                faceCenters[i] = ((unitVertices[faces[i][0]] + unitVertices[faces[i][1]] + unitVertices[faces[i][2]]) / 3f).normalized;
+            }
+
+            bool[] paired = new bool[20];
+            List<(int f1, int f2)> pairs = new List<(int f1, int f2)>();
+
+            for (int i = 0; i < 20; i++)
+            {
+                if (paired[i]) continue;
+                int bestOpposite = -1;
+                float minDot = 1f;
+                for (int j = i + 1; j < 20; j++)
+                {
+                    if (paired[j]) continue;
+                    float dot = Vector3.Dot(faceCenters[i], faceCenters[j]);
+                    if (dot < minDot)
+                    {
+                        minDot = dot;
+                        bestOpposite = j;
+                    }
+                }
+                if (bestOpposite != -1)
+                {
+                    paired[i] = true;
+                    paired[bestOpposite] = true;
+                    pairs.Add((i, bestOpposite));
+                }
+            }
+
+            pairs.Sort((a, b) =>
+            {
+                float maxY_a = Mathf.Max(faceCenters[a.f1].y, faceCenters[a.f2].y);
+                float maxY_b = Mathf.Max(faceCenters[b.f1].y, faceCenters[b.f2].y);
+                return maxY_b.CompareTo(maxY_a);
+            });
+
+            // Standard DnD d20 pairings sum to 21
+            int high = 20;
+            int low = 1;
+            foreach (var pair in pairs)
+            {
+                if (faceCenters[pair.f1].y >= faceCenters[pair.f2].y)
+                {
+                    result[pair.f1] = high;
+                    result[pair.f2] = low;
+                }
+                else
+                {
+                    result[pair.f2] = high;
+                    result[pair.f1] = low;
+                }
+                high--;
+                low++;
+            }
+
+            return result;
         }
     }
 }

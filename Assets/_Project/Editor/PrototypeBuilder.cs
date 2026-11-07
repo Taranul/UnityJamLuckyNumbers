@@ -22,6 +22,7 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             // 2. Load materials
             Material interiorMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/IcosahedronInterior.mat");
             Material exteriorMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/IcosahedronExterior.mat");
+            Material edgeMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/IcosahedronEdge.mat");
             Material playerMat = AssetDatabase.LoadAssetAtPath<Material>("Assets/_Project/Materials/PlayerMaterial.mat");
             PhysicsMaterial interiorPhysMat = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>("Assets/_Project/Materials/InteriorPhysicMaterial.physicMaterial");
             InputActionAsset inputActions = AssetDatabase.LoadAssetAtPath<InputActionAsset>("Assets/_Project/InputSystem_Actions.inputactions");
@@ -53,6 +54,7 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             SerializedObject genSo = new SerializedObject(icoGen);
             genSo.FindProperty("interiorMaterial").objectReferenceValue = interiorMat;
             genSo.FindProperty("exteriorMaterial").objectReferenceValue = exteriorMat;
+            genSo.FindProperty("edgeMaterial").objectReferenceValue = edgeMat;
             genSo.FindProperty("interiorPhysicMaterial").objectReferenceValue = interiorPhysMat;
             genSo.ApplyModifiedProperties();
 
@@ -120,8 +122,8 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
                 CameraController camCtrl = mainCam.GetComponent<CameraController>();
                 if (camCtrl == null) camCtrl = mainCam.gameObject.AddComponent<CameraController>();
                 camCtrl.SetTarget(player.transform);
-                mainCam.transform.position = spawnPos + new Vector3(0f, 1.8f, -3.5f);
-                mainCam.transform.LookAt(spawnPos + Vector3.up * 1.2f);
+                mainCam.transform.position = spawnPos + new Vector3(0f, 6.0f, -16.0f);
+                mainCam.transform.LookAt(spawnPos + Vector3.up * 1.5f);
             }
 
             // 6. Setup Debug UI Canvas
@@ -201,9 +203,9 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
 
         private static void RunOnce()
         {
-            if (!SessionState.GetBool("PrototypeSceneBuilt", false))
+            if (!SessionState.GetBool("PrototypeSceneBuilt_v2", false))
             {
-                SessionState.SetBool("PrototypeSceneBuilt", true);
+                SessionState.SetBool("PrototypeSceneBuilt_v2", true);
                 if (!Application.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     PrototypeBuilder.BuildScene();
