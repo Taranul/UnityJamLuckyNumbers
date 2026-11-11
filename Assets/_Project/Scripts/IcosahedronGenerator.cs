@@ -193,6 +193,35 @@ namespace LuckyNumbers.PhysicsPrototype
             }
         }
 
+        /// <summary>
+        /// Computes the 20 local outward face unit normals and their corresponding DnD face numbers (1-20).
+        /// </summary>
+        public static (Vector3[] normals, int[] numbers) ComputeCanonicalFaceData()
+        {
+            GetIcosahedronGeometry(out Vector3[] unitVertices, out int[][] faces);
+            AlignBottomFace(unitVertices, faces);
+
+            Vector3[] normals = new Vector3[20];
+            for (int i = 0; i < 20; i++)
+            {
+                Vector3 v0 = unitVertices[faces[i][0]];
+                Vector3 v1 = unitVertices[faces[i][1]];
+                Vector3 v2 = unitVertices[faces[i][2]];
+                normals[i] = ((v0 + v1 + v2) / 3f).normalized;
+            }
+
+            int[] numbers = AssignDndFaceNumbers(unitVertices, faces);
+            return (normals, numbers);
+        }
+
+        /// <summary>
+        /// Computes the 20 local outward face unit normals aligned with the canonical bottom floor.
+        /// </summary>
+        public static Vector3[] ComputeCanonicalFaceNormals()
+        {
+            return ComputeCanonicalFaceData().normals;
+        }
+
         private void SetupVisualMesh(Vector3[] unitVertices, int[][] faces)
         {
             MeshFilter filter = GetComponent<MeshFilter>();
@@ -347,13 +376,21 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 u1 = unitVertices[faces[f][1]];
                 Vector3 u2 = unitVertices[faces[f][2]];
 
-                Vector3 v0 = u0 * rIn;
-                Vector3 v1 = u1 * rIn;
-                Vector3 v2 = u2 * rIn;
+                Vector3 faceCenter = (u0 + u1 + u2) / 3f;
+                Vector3 normal = faceCenter.normalized;
+                Vector3 innerCenter = faceCenter * rIn;
 
-                Vector3 v3 = u0 * rOut;
-                Vector3 v4 = u1 * rOut;
-                Vector3 v5 = u2 * rOut;
+                // Slight 0.5% expansion from face center ensures adjacent plates meet seamlessly at edges without gaps
+                Vector3 v0 = innerCenter + (u0 * rIn - innerCenter) * 1.005f;
+                Vector3 v1 = innerCenter + (u1 * rIn - innerCenter) * 1.005f;
+                Vector3 v2 = innerCenter + (u2 * rIn - innerCenter) * 1.005f;
+
+                // Thin triangular plate extruded outward into the wall thickness (0.12m).
+                // Stays 100% inside the 0.5m wall without protruding through the exterior shell.
+                float plateThickness = Mathf.Min(0.12f, wallThickness * 0.25f);
+                Vector3 v3 = v0 + normal * plateThickness;
+                Vector3 v4 = v1 + normal * plateThickness;
+                Vector3 v5 = v2 + normal * plateThickness;
 
                 Vector3[] prismVerts = new Vector3[] { v0, v1, v2, v3, v4, v5 };
 
@@ -475,8 +512,9 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 u1 = unitVertices[face[1]];
                 Vector3 u2 = unitVertices[face[2]];
 
-                Vector3 faceCenter = ((u0 + u1 + u2) / 3f).normalized;
-                Vector3 pos = faceCenter * rOut;
+                Vector3 normal = ((u0 + u1 + u2) / 3f).normalized;
+                Vector3 faceCenter = ((u0 + u1 + u2) / 3f) * rOut;
+                Vector3 pos = faceCenter + normal * 0.02f;
 
                 Vector3 vUp = u0 - faceCenter;
                 Vector3 projUp = Vector3.ProjectOnPlane(vUp, faceCenter).normalized;
@@ -503,7 +541,7 @@ namespace LuckyNumbers.PhysicsPrototype
             }
         }
 
-        private int[] AssignDndFaceNumbers(Vector3[] unitVertices, int[][] faces)
+        public static int[] AssignDndFaceNumbers(Vector3[] unitVertices, int[][] faces)
         {
             int[] result = new int[20];
             Vector3[] faceCenters = new Vector3[20];

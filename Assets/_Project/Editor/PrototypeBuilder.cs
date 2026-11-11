@@ -38,14 +38,28 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
 
             Rigidbody icoRb = icosahedron.GetComponent<Rigidbody>();
             if (icoRb == null) icoRb = icosahedron.AddComponent<Rigidbody>();
-            icoRb.mass = 1000f;
-            icoRb.useGravity = false;
-            icoRb.constraints = RigidbodyConstraints.FreezePosition;
-            icoRb.angularDamping = 1.2f;
-            icoRb.maxAngularVelocity = 5.0f;
+            icoRb.mass = 200f;
+            icoRb.useGravity = true;
+            icoRb.constraints = RigidbodyConstraints.None;
+            icoRb.angularDamping = 1.8f;
+            icoRb.maxAngularVelocity = 6.0f;
+            icoRb.interpolation = RigidbodyInterpolation.Interpolate;
+            icoRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            icoRb.solverIterations = 16;
+            icoRb.solverVelocityIterations = 8;
+            icoRb.maxDepenetrationVelocity = 4.0f;
 
             IcosahedronController icoController = icosahedron.GetComponent<IcosahedronController>();
             if (icoController == null) icoController = icosahedron.AddComponent<IcosahedronController>();
+            SerializedObject icoCtrlSo = new SerializedObject(icoController);
+            icoCtrlSo.FindProperty("targetRigidbody").objectReferenceValue = icoRb;
+            icoCtrlSo.FindProperty("rollAcceleration").floatValue = 16.0f;
+            icoCtrlSo.FindProperty("angularDamping").floatValue = 2.0f;
+            icoCtrlSo.FindProperty("maxAngularVelocity").floatValue = 6.0f;
+            icoCtrlSo.FindProperty("settleStiffness").floatValue = 14.0f;
+            icoCtrlSo.FindProperty("settleDamping").floatValue = 7.5f;
+            icoCtrlSo.FindProperty("flatAngleThreshold").floatValue = 3.0f;
+            icoCtrlSo.ApplyModifiedProperties();
 
             IcosahedronGenerator icoGen = icosahedron.GetComponent<IcosahedronGenerator>();
             if (icoGen == null) icoGen = icosahedron.AddComponent<IcosahedronGenerator>();
@@ -96,16 +110,27 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             playerRb.useGravity = true;
             playerRb.constraints = RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationZ;
             playerRb.interpolation = RigidbodyInterpolation.Interpolate;
-            playerRb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+            playerRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
+            playerRb.solverIterations = 16;
+            playerRb.solverVelocityIterations = 8;
+            playerRb.maxDepenetrationVelocity = 4.0f;
 
             PlayerController playerCtrl = player.GetComponent<PlayerController>();
             if (playerCtrl == null) playerCtrl = player.AddComponent<PlayerController>();
+
+            SerializedObject playerCtrlSo = new SerializedObject(playerCtrl);
+            playerCtrlSo.FindProperty("icosahedronRigidbody").objectReferenceValue = icoRb;
+            playerCtrlSo.FindProperty("moveSpeed").floatValue = 5.0f;
+            playerCtrlSo.FindProperty("acceleration").floatValue = 25.0f;
+            playerCtrlSo.FindProperty("rollResponsiveness").floatValue = 1.6f;
+            playerCtrlSo.FindProperty("wallPushBoost").floatValue = 0.5f;
+            playerCtrlSo.FindProperty("minWalkableNormalY").floatValue = 0.60f;
+            playerCtrlSo.FindProperty("maxClimbHeight").floatValue = -1.8f;
 
             // Find Main Camera
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
-                SerializedObject playerCtrlSo = new SerializedObject(playerCtrl);
                 playerCtrlSo.FindProperty("cameraTransform").objectReferenceValue = mainCam.transform;
 
                 if (inputActions != null)
@@ -116,7 +141,6 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
                         // Note: InputActionReference can be assigned if an asset exists
                     }
                 }
-                playerCtrlSo.ApplyModifiedProperties();
 
                 // 5. Setup Camera Controller
                 CameraController camCtrl = mainCam.GetComponent<CameraController>();
@@ -125,6 +149,7 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
                 mainCam.transform.position = spawnPos + new Vector3(0f, 6.0f, -16.0f);
                 mainCam.transform.LookAt(spawnPos + Vector3.up * 1.5f);
             }
+            playerCtrlSo.ApplyModifiedProperties();
 
             // 6. Setup Debug UI Canvas
             GameObject uiCanvasObj = GameObject.Find("DebugRotationUI");
@@ -156,6 +181,13 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             if (extRb == null) extRb = externalObj.AddComponent<Rigidbody>();
             extRb.mass = 50f;
             extRb.useGravity = true;
+
+            // 8. Position Plane table right beneath the icosahedron (outer radius 8.5m)
+            GameObject plane = GameObject.Find("Plane");
+            if (plane != null)
+            {
+                plane.transform.position = new Vector3(0f, -8.6f, 0f);
+            }
 
             // Mark dirty and save
             EditorSceneManager.MarkSceneDirty(scene);
@@ -203,9 +235,9 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
 
         private static void RunOnce()
         {
-            if (!SessionState.GetBool("PrototypeSceneBuilt_v2", false))
+            if (!SessionState.GetBool("PrototypeSceneBuilt_v6", false))
             {
-                SessionState.SetBool("PrototypeSceneBuilt_v2", true);
+                SessionState.SetBool("PrototypeSceneBuilt_v6", true);
                 if (!Application.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     PrototypeBuilder.BuildScene();

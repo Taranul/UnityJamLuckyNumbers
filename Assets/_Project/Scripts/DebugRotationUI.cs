@@ -20,6 +20,9 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private HoldButton leftButton;
         [SerializeField] private HoldButton rightButton;
 
+        [Header("Roll Status HUD")]
+        [SerializeField] private Text rollStatusText;
+
         private void Awake()
         {
             if (controller == null)
@@ -29,10 +32,23 @@ namespace LuckyNumbers.PhysicsPrototype
 
             EnsureEventSystem();
 
-            if (upButton == null || downButton == null || leftButton == null || rightButton == null)
+            if (upButton == null || downButton == null || leftButton == null || rightButton == null || rollStatusText == null)
             {
                 BuildUI();
             }
+        }
+
+        private void Update()
+        {
+            UpdateStatusHUD();
+        }
+
+        private void UpdateStatusHUD()
+        {
+            if (rollStatusText == null || controller == null) return;
+
+            string state = controller.IsRestingFlat ? "<color=#55ff88>RESTING FLAT</color>" : "<color=#ffcc44>ROLLING...</color>";
+            rollStatusText.text = $"<b>DND ROLL: #{controller.CurrentTopFaceNumber}</b>  ({state})\n<size=14><color=#dddddd>Floor Face: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}°</color></size>";
         }
 
         private void EnsureEventSystem()
@@ -76,6 +92,33 @@ namespace LuckyNumbers.PhysicsPrototype
                     DestroyImmediate(transform.GetChild(i).gameObject);
                 }
             }
+
+            // Top-Center Roll Status Banner
+            GameObject hudBanner = new GameObject("RollStatusBanner");
+            hudBanner.transform.SetParent(transform, false);
+            RectTransform hudRect = hudBanner.AddComponent<RectTransform>();
+            hudRect.anchorMin = new Vector2(0.5f, 1f);
+            hudRect.anchorMax = new Vector2(0.5f, 1f);
+            hudRect.pivot = new Vector2(0.5f, 1f);
+            hudRect.anchoredPosition = new Vector2(0f, -25f);
+            hudRect.sizeDelta = new Vector2(440f, 65f);
+
+            Image hudBg = hudBanner.AddComponent<Image>();
+            hudBg.color = new Color(0.08f, 0.1f, 0.16f, 0.85f);
+
+            GameObject hudTextObj = new GameObject("Text");
+            hudTextObj.transform.SetParent(hudBanner.transform, false);
+            RectTransform textRt = hudTextObj.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.sizeDelta = Vector2.zero;
+
+            rollStatusText = hudTextObj.AddComponent<Text>();
+            rollStatusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+            rollStatusText.fontSize = 20;
+            rollStatusText.alignment = TextAnchor.MiddleCenter;
+            rollStatusText.color = Color.white;
+            rollStatusText.text = "DND ROLL: #20 (RESTING FLAT)\n<size=14><color=#dddddd>Floor Face: #1 | Tilt: 0°</color></size>";
 
             // Panel container in bottom-right corner
             GameObject panel = new GameObject("ControlPadPanel");
