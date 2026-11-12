@@ -73,6 +73,9 @@ namespace LuckyNumbers.PhysicsPrototype
         private float _lastIcoContactTime = -100f;
         private bool _isGroundedOnIcosahedron = false;
         private Vector3 _groundNormal = Vector3.up;
+        private Vector3 _floorNormal = Vector3.up;
+        private bool _hasFloorContact = false;
+        private readonly System.Collections.Generic.List<Vector3> _wallNormals = new System.Collections.Generic.List<Vector3>();
         private bool _isPushingWall = false;
         private float _wallPushDot = 0f;
 
@@ -148,17 +151,19 @@ namespace LuckyNumbers.PhysicsPrototype
             // Stabilize solver contact resolution and prevent depenetration popping
             _rigidbody.solverIterations = 16;
             _rigidbody.solverVelocityIterations = 8;
-            _rigidbody.maxDepenetrationVelocity = 4.0f;
+            _rigidbody.maxDepenetrationVelocity = 8.0f;
 
-            // Solid friction on capsule to provide natural footing traction
+            // Frictionless "soap" physics material to glide smoothly in corners and slopes
             if (_capsuleCollider != null)
             {
-                PhysicsMaterial playerMat = new PhysicsMaterial("PlayerFrictionMat")
+                _capsuleCollider.contactOffset = 0.005f;
+                PhysicsMaterial playerMat = new PhysicsMaterial("PlayerSoapMat")
                 {
-                    dynamicFriction = 0.6f,
-                    staticFriction = 0.8f,
-                    frictionCombine = PhysicsMaterialCombine.Average,
-                    bounciness = 0.0f
+                    dynamicFriction = 0.0f,
+                    staticFriction = 0.0f,
+                    frictionCombine = PhysicsMaterialCombine.Minimum,
+                    bounciness = 0.0f,
+                    bounceCombine = PhysicsMaterialCombine.Minimum
                 };
                 _capsuleCollider.material = playerMat;
             }
@@ -212,7 +217,7 @@ namespace LuckyNumbers.PhysicsPrototype
             _desiredDirection = (camForward * _moveInput.y + camRight * _moveInput.x).normalized;
 
             bool isContacting = (Time.time - _lastIcoContactTime) < (Time.fixedDeltaTime * 2.5f);
-            bool isWalkableSlope = _isGroundedOnIcosahedron && (_groundNormal.y >= minWalkableNormalY);
+            bool isWalkableSlope = _isGroundedOnIcosahedron && (_floorNormal.y >= minWalkableNormalY);
 
             Vector3 currentVelocity = _rigidbody.linearVelocity;
             Vector3 currentHorizontalVel = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
@@ -221,8 +226,6 @@ namespace LuckyNumbers.PhysicsPrototype
             float relativeY = transform.position.y - icoCenter.y;
 
             // --- 1. Enhanced Snappy Character Gravity ---
-            // Scaled gravity gives the character solid, satisfying weight inside the large 12m die,
-            // eliminating sluggish floatiness.
             if (gravityMultiplier > 1.0f)
             {
                 _rigidbody.AddForce(Physics.gravity * (gravityMultiplier - 1.0f), ForceMode.Acceleration);
@@ -231,19 +234,25 @@ namespace LuckyNumbers.PhysicsPrototype
             // --- 2. Ground Snapping & Anti-Launch Adhesion ---
             if (isContacting && isWalkableSlope)
             {
-                // Firm downward adhesion along surface normal
-                Vector3 stickForce = -_groundNormal * groundStickStrength;
-                _rigidbody.AddForce(stickForce, ForceMode.Acceleration);
+                // Firm downward adhesion strictly along the floor support normal or downward.
+                // NEVER pulls horizontally into a wall or corner crevice!
+                Vector3 stickDir = (_floorNormal.y > 0.7f) ? Vector3.down : -_floorNormal;
+                _rigidbody.AddForce(stickDir * groundStickStrength, ForceMode.Acceleration);
 
-                // Anti-launch / anti-bounce: cancel any velocity component lifting away from the surface
-                float normalSpeed = Vector3.Dot(_rigidbody.linearVelocity, _groundNormal);
-                if (normalSpeed > 0.01f)
+                // Anti-launch: cancel ONLY upward lift away from the floor.
+                // NEVER strips horizontal escape velocity when moving out of a corner!
+                float liftOffSpeed = Vector3.Dot(_rigidbody.linearVelocity, _floorNormal);
+                if (liftOffSpeed > 0.01f && _floorNormal.y >= 0.50f)
                 {
-                    _rigidbody.linearVelocity -= _groundNormal * normalSpeed;
+                    Vector3 upwardLift = _floorNormal * liftOffSpeed;
+                    if (upwardLift.y > 0.01f)
+                    {
+                        _rigidbody.linearVelocity -= upwardLift;
+                    }
                 }
             }
 
-            // --- 3. Decoupled Locomotion (Relative to Moving Die) ---
+            // --- 3. Decoupled Locomotion with Soap-Like Corner Deflection ---
             Vector3 icoHorizVel = (icosahedronRigidbody != null) 
                 ? new Vector3(icosahedronRigidbody.linearVelocity.x, 0f, icosahedronRigidbody.linearVelocity.z) 
                 : Vector3.zero;
@@ -253,32 +262,87 @@ namespace LuckyNumbers.PhysicsPrototype
                 // Active surface braking when idle: quickly extinguishes relative drift to stay planted with moving floor
                 if (isContacting)
                 {
-                    Vector3 relativeHorizVel = currentHorizontalVel - icoHorizVel;
+                    Vector3 relativeVel = currentVelocity - (icosahedronRigidbody != null ? icosahedronRigidbody.linearVelocity : Vector3.zero);
+                    Vector3 relativeHorizVel = new Vector3(relativeVel.x, 0f, relativeVel.z);
                     Vector3 brakeForce = -relativeHorizVel * (acceleration * 2.0f);
                     _rigidbody.AddForce(brakeForce, ForceMode.Acceleration);
                 }
             }
             else
             {
-                Vector3 targetHorizontalVel = icoHorizVel + _desiredDirection * (_moveInput.magnitude * moveSpeed);
+                // Soap-like corner and wall deflection:
+                // Smoothly slides along contacting walls and creases instead of getting caught in corners
+                Vector3 effectiveMoveDir = _desiredDirection;
+
+                if (_isPushingWall && _wallNormals.Count > 0)
+                {
+                    if (_wallNormals.Count == 1)
+                    {
+                        Vector3 wallN = _wallNormals[0];
+                        if (Vector3.Dot(effectiveMoveDir, -wallN) > 0.01f)
+                        {
+                            Vector3 deflected = Vector3.ProjectOnPlane(effectiveMoveDir, wallN);
+                            if (deflected.sqrMagnitude > 0.001f)
+                            {
+                                effectiveMoveDir = deflected.normalized;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Vector3 n1 = _wallNormals[0];
+                        Vector3 n2 = _wallNormals[1];
+                        Vector3 seam = Vector3.Cross(n1, n2);
+                        if (seam.sqrMagnitude > 0.001f)
+                        {
+                            seam.Normalize();
+                            if (Vector3.Dot(seam, effectiveMoveDir) < 0f) seam = -seam;
+
+                            if (Vector3.Dot(effectiveMoveDir, -n1) > 0f && Vector3.Dot(effectiveMoveDir, -n2) > 0f)
+                            {
+                                Vector3 seamMove = Vector3.Project(effectiveMoveDir, seam);
+                                if (seamMove.sqrMagnitude > 0.001f)
+                                {
+                                    effectiveMoveDir = seamMove.normalized;
+                                }
+                            }
+                            else
+                            {
+                                Vector3 wallToDeflect = (Vector3.Dot(effectiveMoveDir, -n1) > 0f) ? n1 : n2;
+                                Vector3 deflected = Vector3.ProjectOnPlane(effectiveMoveDir, wallToDeflect);
+                                if (deflected.sqrMagnitude > 0.001f)
+                                {
+                                    effectiveMoveDir = deflected.normalized;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Project onto floor slope for smooth climbing
+                Vector3 moveOnSlope = isWalkableSlope
+                    ? Vector3.ProjectOnPlane(effectiveMoveDir, _floorNormal).normalized
+                    : effectiveMoveDir;
+
+                Vector3 targetHorizontalVel = icoHorizVel + moveOnSlope * (_moveInput.magnitude * moveSpeed);
                 Vector3 horizDifference = targetHorizontalVel - currentHorizontalVel;
 
                 // Air control: damp horizontal acceleration when airborne so player cannot fly in midair
                 float currentAccel = isContacting ? acceleration : (acceleration * airControl);
                 Vector3 moveForce = horizDifference * currentAccel;
 
-                // Strictly horizontal locomotion force - NEVER inject upward Y velocity
-                _rigidbody.AddForce(new Vector3(moveForce.x, 0f, moveForce.z), ForceMode.Acceleration);
+                // Apply locomotion force
+                _rigidbody.AddForce(new Vector3(moveForce.x, moveOnSlope.y * currentAccel * 0.5f, moveForce.z), ForceMode.Acceleration);
 
                 // Orient player along movement direction
-                if (_desiredDirection.sqrMagnitude > 0.01f)
+                if (effectiveMoveDir.sqrMagnitude > 0.01f)
                 {
-                    Quaternion targetRot = Quaternion.LookRotation(_desiredDirection, Vector3.up);
-                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 12f * Time.fixedDeltaTime);
+                    Quaternion targetRot = Quaternion.LookRotation(effectiveMoveDir, Vector3.up);
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, 14f * Time.fixedDeltaTime);
                 }
             }
 
-            // --- 2. Height Restriction (Anti-Jitter Soft Cushion) ---
+            // --- 4. Height Restriction (Anti-Jitter Soft Cushion) ---
             float ceilingSoftZone = 0.5f;
             float softStart = maxClimbHeight - ceilingSoftZone;
             if (relativeY > softStart)
@@ -295,34 +359,35 @@ namespace LuckyNumbers.PhysicsPrototype
                 }
             }
 
-            // --- 3. 3-Tier Die Rolling (Surface Angle, Relative Climb Height, Wall Push & Impact) ---
+            // --- 5. 3-Tier Die Rolling (Surface Angle, Relative Climb Height, Wall Push & Impact) ---
             if (_icoController != null)
             {
-                // Tier 1: Surface Normal Angle (0 on flat floor < 12 deg, scales up to 1.0 on slope)
-                float currentSlopeAngle = Vector3.Angle(_groundNormal, Vector3.up);
+                // Tier 1: Surface Normal Angle (0 on flat floor < minRollSlopeAngle, scales up on slope)
+                float currentSlopeAngle = Vector3.Angle(_floorNormal, Vector3.up);
                 float angleFactor = 0f;
                 if (isWalkableSlope && currentSlopeAngle > minRollSlopeAngle)
                 {
                     angleFactor = Mathf.InverseLerp(minRollSlopeAngle, maxRollSlopeAngle, currentSlopeAngle);
                 }
 
-                // Tier 2: Wall Push Factor (active when walking/pushing into an inclined side wall)
+                // Tier 2: Wall Push Factor (active when walking/pushing into an inclined side wall or corner)
                 float wallPushFactor = _isPushingWall ? (_wallPushDot * wallPushBoost * _moveInput.magnitude) : 0f;
+                if (_isPushingWall && _moveInput.sqrMagnitude > 0.1f)
+                {
+                    wallPushFactor = Mathf.Max(wallPushFactor, 0.6f * _moveInput.magnitude);
+                }
 
                 // Base Drive: climbing slope OR pushing wall drives the roll!
-                // If on flat floor and NOT pushing a wall -> baseDrive = 0 (die stays still).
-                // If climbing slope or pushing wall -> baseDrive > 0 (die rolls!).
                 float baseDrive = Mathf.Max(angleFactor, wallPushFactor);
                 if (angleFactor > 0.05f && wallPushFactor > 0.05f)
                 {
                     baseDrive = angleFactor + wallPushFactor;
                 }
 
-                // If player is actively pressing movement keys AND the die is already rolling/tilting:
-                // Maintain roll momentum so the die doesn't stall or snap backwards halfway through!
-                if (_moveInput.sqrMagnitude > 0.2f && _icoController.CurrentTiltAngle > 6.0f)
+                // Maintain roll momentum when actively pushing movement keys
+                if (_moveInput.sqrMagnitude > 0.1f && (_icoController.CurrentTiltAngle > 4.0f || _isPushingWall))
                 {
-                    baseDrive = Mathf.Max(baseDrive, 0.45f);
+                    baseDrive = Mathf.Max(baseDrive, 0.55f);
                 }
 
                 // Tier 3: Height leverage multiplier (the higher up the player climbs, the more torque)
@@ -339,7 +404,7 @@ namespace LuckyNumbers.PhysicsPrototype
 
                     float floorRadius = 6.046f;
                     float baseAngularSpeed = (moveSpeed / floorRadius) * rollResponsiveness * totalEffort;
-                    baseAngularSpeed = Mathf.Min(baseAngularSpeed, 3.8f);
+                    baseAngularSpeed = Mathf.Min(baseAngularSpeed, 4.0f);
 
                     _icoController.DriveRollFromPlayer(rollAxis, baseAngularSpeed, totalEffort, horizDir);
                 }
@@ -414,37 +479,65 @@ namespace LuckyNumbers.PhysicsPrototype
 
             _lastIcoContactTime = Time.time;
             _isGroundedOnIcosahedron = false;
+            _hasFloorContact = false;
+            _wallNormals.Clear();
 
             int contactCount = collision.contactCount;
-            Vector3 accumulatedGroundNormal = Vector3.zero;
-            int groundContacts = 0;
+            float bestFloorY = -1f;
+            Vector3 bestFloorNormal = Vector3.up;
 
             for (int i = 0; i < contactCount; i++)
             {
                 ContactPoint contact = collision.GetContact(i);
 
-                if (contact.normal.y > 0.25f)
+                // Support surface under feet (floor): normal.y >= 0.50f
+                if (contact.normal.y >= 0.50f)
                 {
                     _isGroundedOnIcosahedron = true;
-                    accumulatedGroundNormal += contact.normal;
-                    groundContacts++;
+                    if (contact.normal.y > bestFloorY)
+                    {
+                        bestFloorY = contact.normal.y;
+                        bestFloorNormal = contact.normal;
+                        _hasFloorContact = true;
+                    }
                 }
 
-                // Detect if player is walking directly into an inclined side wall
-                if (_moveInput.sqrMagnitude > 0.01f && _desiredDirection.sqrMagnitude > 0.01f)
+                // Steep walls and corner dihedral surfaces (normal.y < 0.85f):
+                // Record for soap-like deflection and wall pushing
+                if (contact.normal.y < 0.85f)
                 {
-                    float pushDot = Vector3.Dot(_desiredDirection, -contact.normal);
-                    if (pushDot > 0.15f && contact.normal.y < 0.95f)
+                    bool isDuplicate = false;
+                    for (int w = 0; w < _wallNormals.Count; w++)
                     {
-                        _isPushingWall = true;
-                        _wallPushDot = Mathf.Max(_wallPushDot, pushDot);
+                        if (Vector3.Dot(_wallNormals[w], contact.normal) > 0.92f)
+                        {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+
+                    if (!isDuplicate && _wallNormals.Count < 4)
+                    {
+                        _wallNormals.Add(contact.normal);
+                    }
+
+                    // Detect if player is walking directly into an inclined side wall or corner
+                    if (_moveInput.sqrMagnitude > 0.01f && _desiredDirection.sqrMagnitude > 0.01f)
+                    {
+                        float pushDot = Vector3.Dot(_desiredDirection, -contact.normal);
+                        if (pushDot > 0.10f)
+                        {
+                            _isPushingWall = true;
+                            _wallPushDot = Mathf.Clamp01(_wallPushDot + pushDot);
+                        }
                     }
                 }
             }
 
-            if (groundContacts > 0)
+            if (_hasFloorContact)
             {
-                _groundNormal = (accumulatedGroundNormal / groundContacts).normalized;
+                _floorNormal = bestFloorNormal.normalized;
+                _groundNormal = _floorNormal;
             }
         }
     }

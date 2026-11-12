@@ -352,6 +352,10 @@ namespace LuckyNumbers.PhysicsPrototype
             MeshCollider mc = exteriorObj.AddComponent<MeshCollider>();
             mc.sharedMesh = exteriorMesh;
             mc.convex = true;
+            if (interiorPhysicMaterial != null)
+            {
+                mc.material = interiorPhysicMaterial;
+            }
         }
 
         private void SetupInteriorColliders(Vector3[] unitVertices, int[][] faces)
@@ -380,10 +384,10 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 normal = faceCenter.normalized;
                 Vector3 innerCenter = faceCenter * rIn;
 
-                // Slight 0.5% expansion from face center ensures adjacent plates meet seamlessly at edges without gaps
-                Vector3 v0 = innerCenter + (u0 * rIn - innerCenter) * 1.005f;
-                Vector3 v1 = innerCenter + (u1 * rIn - innerCenter) * 1.005f;
-                Vector3 v2 = innerCenter + (u2 * rIn - innerCenter) * 1.005f;
+                // Exact vertex positions ensure adjacent plates meet seamlessly with zero gaps, ridges, or overlapping lips
+                Vector3 v0 = u0 * rIn;
+                Vector3 v1 = u1 * rIn;
+                Vector3 v2 = u2 * rIn;
 
                 // Thin triangular plate extruded outward into the wall thickness (0.12m).
                 // Stays 100% inside the 0.5m wall without protruding through the exterior shell.

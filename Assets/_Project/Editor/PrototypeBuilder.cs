@@ -47,7 +47,7 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             icoRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             icoRb.solverIterations = 16;
             icoRb.solverVelocityIterations = 8;
-            icoRb.maxDepenetrationVelocity = 4.0f;
+            icoRb.maxDepenetrationVelocity = 8.0f;
 
             IcosahedronController icoController = icosahedron.GetComponent<IcosahedronController>();
             if (icoController == null) icoController = icosahedron.AddComponent<IcosahedronController>();
@@ -58,9 +58,9 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             icoCtrlSo.FindProperty("tableFloorY").floatValue = -8.6f;
             icoCtrlSo.FindProperty("outerFaceRadius").floatValue = 6.424f;
             icoCtrlSo.FindProperty("travelSpeedMultiplier").floatValue = 1.0f;
-            icoCtrlSo.FindProperty("rollAcceleration").floatValue = 16.0f;
-            icoCtrlSo.FindProperty("angularDamping").floatValue = 2.0f;
-            icoCtrlSo.FindProperty("maxAngularVelocity").floatValue = 3.5f;
+            icoCtrlSo.FindProperty("rollAcceleration").floatValue = 24.0f;
+            icoCtrlSo.FindProperty("angularDamping").floatValue = 1.5f;
+            icoCtrlSo.FindProperty("maxAngularVelocity").floatValue = 4.0f;
             icoCtrlSo.FindProperty("settleStiffness").floatValue = 14.0f;
             icoCtrlSo.FindProperty("settleDamping").floatValue = 7.5f;
             icoCtrlSo.FindProperty("flatAngleThreshold").floatValue = 3.0f;
@@ -108,6 +108,8 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             playerCol.center = new Vector3(0f, 0f, 0f);
             playerCol.height = 2f;
             playerCol.radius = 0.5f;
+            playerCol.material = interiorPhysMat;
+            playerCol.contactOffset = 0.005f;
 
             Rigidbody playerRb = player.GetComponent<Rigidbody>();
             if (playerRb == null) playerRb = player.AddComponent<Rigidbody>();
@@ -118,7 +120,7 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             playerRb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             playerRb.solverIterations = 16;
             playerRb.solverVelocityIterations = 8;
-            playerRb.maxDepenetrationVelocity = 4.0f;
+            playerRb.maxDepenetrationVelocity = 8.0f;
 
             PlayerController playerCtrl = player.GetComponent<PlayerController>();
             if (playerCtrl == null) playerCtrl = player.AddComponent<PlayerController>();
@@ -126,18 +128,18 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             SerializedObject playerCtrlSo = new SerializedObject(playerCtrl);
             playerCtrlSo.FindProperty("icosahedronRigidbody").objectReferenceValue = icoRb;
             playerCtrlSo.FindProperty("moveSpeed").floatValue = 10.0f;
-            playerCtrlSo.FindProperty("acceleration").floatValue = 25.0f;
+            playerCtrlSo.FindProperty("acceleration").floatValue = 30.0f;
             playerCtrlSo.FindProperty("gravityMultiplier").floatValue = 2.5f;
-            playerCtrlSo.FindProperty("groundStickStrength").floatValue = 25.0f;
+            playerCtrlSo.FindProperty("groundStickStrength").floatValue = 20.0f;
             playerCtrlSo.FindProperty("airControl").floatValue = 0.2f;
-            playerCtrlSo.FindProperty("minRollSlopeAngle").floatValue = 12.0f;
-            playerCtrlSo.FindProperty("maxRollSlopeAngle").floatValue = 38.0f;
-            playerCtrlSo.FindProperty("rollResponsiveness").floatValue = 1.2f;
-            playerCtrlSo.FindProperty("heightTorqueMultiplier").floatValue = 0.45f;
-            playerCtrlSo.FindProperty("wallPushBoost").floatValue = 0.8f;
-            playerCtrlSo.FindProperty("minImpactSpeedForKick").floatValue = 2.0f;
-            playerCtrlSo.FindProperty("wallImpactKickStrength").floatValue = 1.4f;
-            playerCtrlSo.FindProperty("minWalkableNormalY").floatValue = 0.60f;
+            playerCtrlSo.FindProperty("minRollSlopeAngle").floatValue = 10.0f;
+            playerCtrlSo.FindProperty("maxRollSlopeAngle").floatValue = 35.0f;
+            playerCtrlSo.FindProperty("rollResponsiveness").floatValue = 1.4f;
+            playerCtrlSo.FindProperty("heightTorqueMultiplier").floatValue = 0.5f;
+            playerCtrlSo.FindProperty("wallPushBoost").floatValue = 1.2f;
+            playerCtrlSo.FindProperty("minImpactSpeedForKick").floatValue = 1.5f;
+            playerCtrlSo.FindProperty("wallImpactKickStrength").floatValue = 1.6f;
+            playerCtrlSo.FindProperty("minWalkableNormalY").floatValue = 0.55f;
             playerCtrlSo.FindProperty("maxClimbHeight").floatValue = -1.8f;
 
             // Find Main Camera
@@ -200,6 +202,8 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             if (plane != null)
             {
                 plane.transform.position = new Vector3(0f, -8.6f, 0f);
+                MeshCollider planeCol = plane.GetComponent<MeshCollider>();
+                if (planeCol != null) planeCol.material = interiorPhysMat;
             }
 
             // Mark dirty and save
@@ -248,9 +252,9 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
 
         private static void RunOnce()
         {
-            if (!SessionState.GetBool("PrototypeSceneBuilt_v6", false))
+            if (!SessionState.GetBool("PrototypeSceneBuilt_v7", false))
             {
-                SessionState.SetBool("PrototypeSceneBuilt_v6", true);
+                SessionState.SetBool("PrototypeSceneBuilt_v7", true);
                 if (!Application.isPlaying && !EditorApplication.isPlayingOrWillChangePlaymode)
                 {
                     PrototypeBuilder.BuildScene();

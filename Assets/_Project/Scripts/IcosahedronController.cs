@@ -26,9 +26,9 @@ namespace LuckyNumbers.PhysicsPrototype
         [Header("Smooth Momentum & Vector Dynamics")]
         [SerializeField] private Rigidbody targetRigidbody;
         [Tooltip("Rate at which the die accelerates up to target roll speed (rad/s²).")]
-        [SerializeField] private float rollAcceleration = 8.0f;
+        [SerializeField] private float rollAcceleration = 20.0f;
         [Tooltip("Braking deceleration when player pushes against current roll direction (rad/s²).")]
-        [SerializeField] private float reverseBrakeDeceleration = 14.0f;
+        [SerializeField] private float reverseBrakeDeceleration = 30.0f;
         [Tooltip("Steering turn rate when redirecting the roll direction (deg/sec).")]
         [SerializeField] private float steeringTurnRate = 200.0f;
         [Tooltip("Natural rolling friction / deceleration when no player torque is applied (rad/s²).")]
@@ -159,7 +159,7 @@ namespace LuckyNumbers.PhysicsPrototype
             // Stabilize solver contact resolution between moving bodies
             targetRigidbody.solverIterations = 16;
             targetRigidbody.solverVelocityIterations = 8;
-            targetRigidbody.maxDepenetrationVelocity = 4.0f;
+            targetRigidbody.maxDepenetrationVelocity = 8.0f;
         }
 
         /// <summary>
@@ -355,47 +355,31 @@ namespace LuckyNumbers.PhysicsPrototype
                 isActivelyRolling = true;
             }
 
-            // 2. Smooth Vector Momentum & Alignment Dynamics
-            float currentSpeed = _currentRollAngularVel.magnitude;
-
+            // 2. Smooth Vector Momentum & Responsive Turnaround
             if (isActivelyRolling)
             {
-                if (currentSpeed < 0.05f)
-                {
-                    // Stationary or nearly stopped: accelerate directly along desired axis
-                    _currentRollAngularVel = desiredRollAxis * Mathf.MoveTowards(0f, desiredRollSpeed, rollAcceleration * dt);
-                }
-                else
-                {
-                    Vector3 currentAxis = _currentRollAngularVel / currentSpeed;
-                    float alignment = Vector3.Dot(currentAxis, desiredRollAxis);
+                Vector3 targetRollVel = desiredRollAxis * desiredRollSpeed;
+                float dot = (_currentRollAngularVel.sqrMagnitude > 0.001f)
+                    ? Vector3.Dot(_currentRollAngularVel.normalized, desiredRollAxis)
+                    : 1f;
 
-                    if (alignment < -0.1f)
-                    {
-                        // OPPOSING DIRECTION: Player input opposes current roll!
-                        // Brake current roll speed down to 0 first before reversing direction.
-                        float brakedSpeed = Mathf.MoveTowards(currentSpeed, 0f, reverseBrakeDeceleration * dt);
-                        _currentRollAngularVel = currentAxis * brakedSpeed;
-                    }
-                    else
-                    {
-                        // ALIGNED / STEERING DIRECTION: Smoothly rotate roll axis toward desired direction
-                        Vector3 steeredAxis = Vector3.RotateTowards(
-                            currentAxis,
-                            desiredRollAxis,
-                            steeringTurnRate * Mathf.Deg2Rad * dt,
-                            0f
-                        ).normalized;
-
-                        float newSpeed = Mathf.MoveTowards(currentSpeed, desiredRollSpeed, rollAcceleration * dt);
-                        newSpeed = Mathf.Min(newSpeed, maxRollSpeed);
-                        _currentRollAngularVel = steeredAxis * newSpeed;
-                    }
+                if (dot >= 0.05f && _currentRollAngularVel.sqrMagnitude > 0.01f)
+                {
+                    Vector3 currentAxis = _currentRollAngularVel.normalized;
+                    Vector3 steeredAxis = Vector3.RotateTowards(currentAxis, desiredRollAxis, steeringTurnRate * Mathf.Deg2Rad * dt, 0f).normalized;
+                    targetRollVel = steeredAxis * desiredRollSpeed;
                 }
+
+                // Responsive turnaround: accelerate toward desired direction.
+                // If reversing, accelerate quickly using reverseBrakeDeceleration to eliminate turnaround delay.
+                float currentAccel = (dot < -0.05f) ? reverseBrakeDeceleration : rollAcceleration;
+                _currentRollAngularVel = Vector3.MoveTowards(_currentRollAngularVel, targetRollVel, currentAccel * dt);
+                _currentRollAngularVel = Vector3.ClampMagnitude(_currentRollAngularVel, maxRollSpeed);
             }
             else
             {
                 // 3. Natural Rolling Friction (Coasting Deceleration)
+                float currentSpeed = _currentRollAngularVel.magnitude;
                 if (currentSpeed > 0.01f)
                 {
                     Vector3 currentAxis = _currentRollAngularVel / currentSpeed;
