@@ -5,31 +5,58 @@ namespace LuckyNumbers.PhysicsPrototype
 {
     /// <summary>
     /// Rigidbody-based character controller for the player inside the icosahedron (d20 die).
-    /// - Stays firmly on internal surfaces when idle (active surface braking, zero drift).
-    /// - Moves with WASD, naturally rolling the die underneath the player.
-    /// - Cannot climb or lift higher than the adjacent side surfaces.
+    /// - Natural decoupled gravity: horizontal WASD movement never fights or cancels downward gravity.
+    /// - Ground-sticking downforce prevents floating off slopes without artificial weight spikes.
+    /// - Angle-based die rolling: flat floor is a safe zone (0% torque); climbing slopes builds leverage;
+    ///   pushing walls while climbing delivers maximum rolling power.
+    /// - Smooth anti-jitter cushion at height boundaries.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     [RequireComponent(typeof(CapsuleCollider))]
     public class PlayerController : MonoBehaviour
     {
         [Header("Movement Settings")]
-        [SerializeField] private float moveSpeed = 5.0f;
+        [SerializeField] private float moveSpeed = 10.0f;
         [SerializeField] private float acceleration = 25.0f;
         [SerializeField] private Transform cameraTransform;
 
-        [Header("Die Interaction")]
-        [Tooltip("Responsiveness multiplier for rolling the die with player movement.")]
-        [SerializeField] private float rollResponsiveness = 1.6f;
+        [Header("Ground & Gravity Settings")]
+        [Tooltip("Enhanced downward gravity multiplier for responsive, snappy character weight (default 2.5x).")]
+        [SerializeField] private float gravityMultiplier = 2.5f;
 
-        [Tooltip("Additional roll speed boost when actively running into an inclined side wall.")]
-        [SerializeField] private float wallPushBoost = 0.5f;
+        [Tooltip("Downward adhesion force keeping feet firmly planted on slopes and floor (default 25 m/s²).")]
+        [SerializeField] private float groundStickStrength = 25.0f;
+
+        [Tooltip("Reduced horizontal acceleration multiplier while airborne (prevents floating in midair).")]
+        [SerializeField] private float airControl = 0.2f;
 
         [Tooltip("Minimum surface normal Y component required to walk up a surface. Normal Y of side faces is ~0.75 (41.8 deg slope). Surfaces steeper than ~53 deg cannot be climbed.")]
         [SerializeField] private float minWalkableNormalY = 0.60f;
 
         [Tooltip("Maximum allowed height of player center relative to icosahedron center. Top of side faces is at -2.62m.")]
         [SerializeField] private float maxClimbHeight = -1.8f;
+
+        [Header("Die Interaction & 3-Tier Drive")]
+        [Tooltip("Below this slope angle (degrees), the player is in the flat floor safe zone and exerts zero rotation on the die.")]
+        [SerializeField] private float minRollSlopeAngle = 12.0f;
+
+        [Tooltip("At or above this slope angle (degrees), the player achieves 100% climbing angle leverage.")]
+        [SerializeField] private float maxRollSlopeAngle = 38.0f;
+
+        [Tooltip("How much relative climb height from the lowest floor point increases rotational torque.")]
+        [SerializeField] private float heightTorqueMultiplier = 0.45f;
+
+        [Tooltip("Responsiveness multiplier for rolling the die with player movement.")]
+        [SerializeField] private float rollResponsiveness = 1.2f;
+
+        [Tooltip("Additional roll torque multiplier when actively running into an inclined side wall.")]
+        [SerializeField] private float wallPushBoost = 0.8f;
+
+        [Tooltip("Minimum impact velocity (m/s) to trigger a wall collision impact kick.")]
+        [SerializeField] private float minImpactSpeedForKick = 2.0f;
+
+        [Tooltip("Torque impulse strength applied to the die when slamming into an interior wall.")]
+        [SerializeField] private float wallImpactKickStrength = 1.4f;
 
         [Tooltip("Reference to the icosahedron Rigidbody. If unassigned, automatically located at runtime.")]
         [SerializeField] private Rigidbody icosahedronRigidbody;
@@ -47,6 +74,7 @@ namespace LuckyNumbers.PhysicsPrototype
         private bool _isGroundedOnIcosahedron = false;
         private Vector3 _groundNormal = Vector3.up;
         private bool _isPushingWall = false;
+        private float _wallPushDot = 0f;
 
         private void Awake()
         {
@@ -187,55 +215,60 @@ namespace LuckyNumbers.PhysicsPrototype
             bool isWalkableSlope = _isGroundedOnIcosahedron && (_groundNormal.y >= minWalkableNormalY);
 
             Vector3 currentVelocity = _rigidbody.linearVelocity;
+            Vector3 currentHorizontalVel = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
+
             Vector3 icoCenter = (icosahedronRigidbody != null) ? icosahedronRigidbody.worldCenterOfMass : Vector3.zero;
             float relativeY = transform.position.y - icoCenter.y;
 
-            // --- 1. Player Locomotion ---
+            // --- 1. Enhanced Snappy Character Gravity ---
+            // Scaled gravity gives the character solid, satisfying weight inside the large 12m die,
+            // eliminating sluggish floatiness.
+            if (gravityMultiplier > 1.0f)
+            {
+                _rigidbody.AddForce(Physics.gravity * (gravityMultiplier - 1.0f), ForceMode.Acceleration);
+            }
+
+            // --- 2. Ground Snapping & Anti-Launch Adhesion ---
+            if (isContacting && isWalkableSlope)
+            {
+                // Firm downward adhesion along surface normal
+                Vector3 stickForce = -_groundNormal * groundStickStrength;
+                _rigidbody.AddForce(stickForce, ForceMode.Acceleration);
+
+                // Anti-launch / anti-bounce: cancel any velocity component lifting away from the surface
+                float normalSpeed = Vector3.Dot(_rigidbody.linearVelocity, _groundNormal);
+                if (normalSpeed > 0.01f)
+                {
+                    _rigidbody.linearVelocity -= _groundNormal * normalSpeed;
+                }
+            }
+
+            // --- 3. Decoupled Locomotion (Relative to Moving Die) ---
+            Vector3 icoHorizVel = (icosahedronRigidbody != null) 
+                ? new Vector3(icosahedronRigidbody.linearVelocity.x, 0f, icosahedronRigidbody.linearVelocity.z) 
+                : Vector3.zero;
+
             if (_moveInput.sqrMagnitude < 0.01f)
             {
-                // Active surface braking when idle: plants feet firmly on the floor face
+                // Active surface braking when idle: quickly extinguishes relative drift to stay planted with moving floor
                 if (isContacting)
                 {
-                    Vector3 horizVelocity = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
-                    Vector3 brakeForce = -horizVelocity * (acceleration * 2.0f);
+                    Vector3 relativeHorizVel = currentHorizontalVel - icoHorizVel;
+                    Vector3 brakeForce = -relativeHorizVel * (acceleration * 2.0f);
                     _rigidbody.AddForce(brakeForce, ForceMode.Acceleration);
                 }
             }
             else
             {
-                // Moving: project direction onto walkable ground slope
-                Vector3 moveDirection = _desiredDirection;
-                if (isWalkableSlope)
-                {
-                    Vector3 projected = Vector3.ProjectOnPlane(_desiredDirection, _groundNormal).normalized;
-                    // Only use slope projection if not climbing beyond side surface
-                    if (relativeY < maxClimbHeight || projected.y <= 0f)
-                    {
-                        moveDirection = projected;
-                    }
-                    else
-                    {
-                        // At top of side surface: keep movement purely horizontal
-                        moveDirection = new Vector3(_desiredDirection.x, 0f, _desiredDirection.z).normalized;
-                    }
-                }
-                else if (isContacting && _groundNormal.y < minWalkableNormalY)
-                {
-                    // On steep unwalkable surfaces: do not allow upward ascent
-                    moveDirection = new Vector3(_desiredDirection.x, 0f, _desiredDirection.z).normalized;
-                }
+                Vector3 targetHorizontalVel = icoHorizVel + _desiredDirection * (_moveInput.magnitude * moveSpeed);
+                Vector3 horizDifference = targetHorizontalVel - currentHorizontalVel;
 
-                Vector3 targetVelocity = moveDirection * (_moveInput.magnitude * moveSpeed);
-                Vector3 velDifference = targetVelocity - currentVelocity;
+                // Air control: damp horizontal acceleration when airborne so player cannot fly in midair
+                float currentAccel = isContacting ? acceleration : (acceleration * airControl);
+                Vector3 moveForce = horizDifference * currentAccel;
 
-                // If at the height limit, smoothly suppress upward acceleration
-                if (relativeY >= maxClimbHeight && velDifference.y > 0f)
-                {
-                    velDifference.y = Mathf.Lerp(velDifference.y, 0f, 0.85f);
-                }
-
-                Vector3 moveForce = velDifference * acceleration;
-                _rigidbody.AddForce(moveForce, ForceMode.Acceleration);
+                // Strictly horizontal locomotion force - NEVER inject upward Y velocity
+                _rigidbody.AddForce(new Vector3(moveForce.x, 0f, moveForce.z), ForceMode.Acceleration);
 
                 // Orient player along movement direction
                 if (_desiredDirection.sqrMagnitude > 0.01f)
@@ -246,8 +279,6 @@ namespace LuckyNumbers.PhysicsPrototype
             }
 
             // --- 2. Height Restriction (Anti-Jitter Soft Cushion) ---
-            // Progressively absorb upward velocity as player approaches or exceeds the side surface height,
-            // avoiding hard velocity-zeroing discontinuities that cause 50Hz collider chatter/jitter.
             float ceilingSoftZone = 0.5f;
             float softStart = maxClimbHeight - ceilingSoftZone;
             if (relativeY > softStart)
@@ -256,56 +287,106 @@ namespace LuckyNumbers.PhysicsPrototype
                 Vector3 currentVel = _rigidbody.linearVelocity;
                 if (currentVel.y > 0f)
                 {
-                    // Smoothly bleed off upward velocity
                     Vector3 vel = currentVel;
                     vel.y = Mathf.Lerp(vel.y, 0f, 12f * t * Time.fixedDeltaTime);
                     _rigidbody.linearVelocity = vel;
 
-                    // Apply soft downward deceleration force proportional to intrusion depth
                     _rigidbody.AddForce(Vector3.down * (acceleration * t * 1.5f), ForceMode.Acceleration);
                 }
             }
 
-            // --- 3. Harmonious Die Rolling ---
+            // --- 3. 3-Tier Die Rolling (Surface Angle, Relative Climb Height, Wall Push & Impact) ---
             if (_icoController != null)
             {
-                if (_moveInput.sqrMagnitude > 0.01f && isContacting)
+                // Tier 1: Surface Normal Angle (0 on flat floor < 12 deg, scales up to 1.0 on slope)
+                float currentSlopeAngle = Vector3.Angle(_groundNormal, Vector3.up);
+                float angleFactor = 0f;
+                if (isWalkableSlope && currentSlopeAngle > minRollSlopeAngle)
+                {
+                    angleFactor = Mathf.InverseLerp(minRollSlopeAngle, maxRollSlopeAngle, currentSlopeAngle);
+                }
+
+                // Tier 2: Wall Push Factor (active when walking/pushing into an inclined side wall)
+                float wallPushFactor = _isPushingWall ? (_wallPushDot * wallPushBoost * _moveInput.magnitude) : 0f;
+
+                // Base Drive: climbing slope OR pushing wall drives the roll!
+                // If on flat floor and NOT pushing a wall -> baseDrive = 0 (die stays still).
+                // If climbing slope or pushing wall -> baseDrive > 0 (die rolls!).
+                float baseDrive = Mathf.Max(angleFactor, wallPushFactor);
+                if (angleFactor > 0.05f && wallPushFactor > 0.05f)
+                {
+                    baseDrive = angleFactor + wallPushFactor;
+                }
+
+                // If player is actively pressing movement keys AND the die is already rolling/tilting:
+                // Maintain roll momentum so the die doesn't stall or snap backwards halfway through!
+                if (_moveInput.sqrMagnitude > 0.2f && _icoController.CurrentTiltAngle > 6.0f)
+                {
+                    baseDrive = Mathf.Max(baseDrive, 0.45f);
+                }
+
+                // Tier 3: Height leverage multiplier (the higher up the player climbs, the more torque)
+                float lowestFloorY = _icoController.LowestInteriorFloorY;
+                float climbHeight = Mathf.Max(0f, transform.position.y - (lowestFloorY + 1.0f));
+                float heightMultiplier = 1.0f + (climbHeight * heightTorqueMultiplier);
+
+                float totalEffort = baseDrive * heightMultiplier;
+
+                if (totalEffort > 0.02f && isContacting && _desiredDirection.sqrMagnitude > 0.001f)
                 {
                     Vector3 horizDir = new Vector3(_desiredDirection.x, 0f, _desiredDirection.z).normalized;
-                    if (horizDir.sqrMagnitude > 0.001f)
-                    {
-                        // World rotation axis rolling the die forward in the movement direction
-                        Vector3 rollAxis = Vector3.Cross(Vector3.up, horizDir);
+                    Vector3 rollAxis = Vector3.Cross(Vector3.up, horizDir);
 
-                        // Angular speed proportional to player movement speed (omega = v / R)
-                        float floorRadius = 6.046f;
-                        float baseAngularSpeed = (moveSpeed / floorRadius) * rollResponsiveness * _moveInput.magnitude;
+                    float floorRadius = 6.046f;
+                    float baseAngularSpeed = (moveSpeed / floorRadius) * rollResponsiveness * totalEffort;
+                    baseAngularSpeed = Mathf.Min(baseAngularSpeed, 3.8f);
 
-                        if (_isPushingWall)
-                        {
-                            baseAngularSpeed *= (1.0f + wallPushBoost);
-                        }
-
-                        _icoController.DriveRollFromPlayer(rollAxis, baseAngularSpeed);
-                    }
-                    else
-                    {
-                        _icoController.StopRollFromPlayer();
-                    }
+                    _icoController.DriveRollFromPlayer(rollAxis, baseAngularSpeed, totalEffort, horizDir);
                 }
                 else
                 {
-                    // Idle: stop active player rolling and let the die settle flat onto the nearest face
                     _icoController.StopRollFromPlayer();
                 }
             }
 
             _isPushingWall = false;
+            _wallPushDot = 0f;
         }
 
         private void OnCollisionEnter(Collision collision)
         {
             ProcessCollision(collision);
+            CheckWallImpactKick(collision);
+        }
+
+        private void CheckWallImpactKick(Collision collision)
+        {
+            if (_icoController == null) return;
+
+            Rigidbody otherRb = collision.rigidbody ?? collision.gameObject.GetComponentInParent<Rigidbody>();
+            if (otherRb != icosahedronRigidbody) return;
+
+            float impactSpeed = collision.relativeVelocity.magnitude;
+            if (impactSpeed < minImpactSpeedForKick) return;
+
+            int count = collision.contactCount;
+            for (int i = 0; i < count; i++)
+            {
+                ContactPoint contact = collision.GetContact(i);
+                // Steep surface: normal.y < 0.65f means wall or steep incline
+                if (contact.normal.y < 0.65f)
+                {
+                    Vector3 hitDirection = -contact.normal;
+                    Vector3 horizHit = new Vector3(hitDirection.x, 0f, hitDirection.z);
+                    if (horizHit.sqrMagnitude > 0.01f)
+                    {
+                        Vector3 rollAxis = Vector3.Cross(Vector3.up, horizHit.normalized);
+                        float kickImpulse = (impactSpeed - minImpactSpeedForKick) * wallImpactKickStrength;
+                        _icoController.ApplyWallImpactKick(rollAxis, kickImpulse);
+                        break;
+                    }
+                }
+            }
         }
 
         private void OnCollisionStay(Collision collision)
@@ -356,6 +437,7 @@ namespace LuckyNumbers.PhysicsPrototype
                     if (pushDot > 0.15f && contact.normal.y < 0.95f)
                     {
                         _isPushingWall = true;
+                        _wallPushDot = Mathf.Max(_wallPushDot, pushDot);
                     }
                 }
             }

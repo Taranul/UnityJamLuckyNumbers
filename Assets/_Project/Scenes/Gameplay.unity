@@ -162,7 +162,7 @@ TextMesh:
   m_GameObject: {fileID: 28838431}
   m_Text: 6
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -932,6 +932,7 @@ MeshRenderer:
   m_RendererPriority: 0
   m_Materials:
   - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: 941d6565a846dbb42a652a02d7a180f9, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1736,6 +1737,8 @@ MonoBehaviour:
   minPitch: -40
   maxPitch: 85
   positionSmoothTime: 0.08
+  landingShakeDuration: 0.18
+  landingShakeMagnitude: 0.28
 --- !u!1 &371188644
 GameObject:
   m_ObjectHideFlags: 0
@@ -2373,7 +2376,7 @@ TextMesh:
   m_GameObject: {fileID: 453739809}
   m_Text: 4
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -2477,7 +2480,7 @@ TextMesh:
   m_GameObject: {fileID: 485749145}
   m_Text: 18
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -3239,7 +3242,7 @@ TextMesh:
   m_GameObject: {fileID: 653089218}
   m_Text: 2
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -3775,15 +3778,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.IcosahedronController
   targetRigidbody: {fileID: 773711801}
-  rollAcceleration: 20
+  rollAcceleration: 24
   angularDamping: 2
-  maxAngularVelocity: 10
+  maxAngularVelocity: 3.5
+  rollMode: 0
+  enableWorldTravel: 1
+  tableFloorY: -8.6
+  outerFaceRadius: 6.424
+  travelSpeedMultiplier: 1
   enableTableRestingStability: 1
   settleStiffness: 14
   settleDamping: 7.5
   flatAngleThreshold: 3
   enableKeyboardDebug: 1
-  debugRotationSpeed: 6
+  debugRotationSpeed: 2.5
 --- !u!54 &773711801
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4465,7 +4473,7 @@ TextMesh:
   m_GameObject: {fileID: 971034898}
   m_Text: 15
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -4569,7 +4577,7 @@ TextMesh:
   m_GameObject: {fileID: 974946446}
   m_Text: 11
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -4851,7 +4859,7 @@ TextMesh:
   m_GameObject: {fileID: 1033566911}
   m_Text: 14
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -5009,7 +5017,7 @@ TextMesh:
   m_GameObject: {fileID: 1059435433}
   m_Text: 8
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -5113,7 +5121,7 @@ TextMesh:
   m_GameObject: {fileID: 1077733851}
   m_Text: 7
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -5296,7 +5304,7 @@ TextMesh:
   m_GameObject: {fileID: 1118190857}
   m_Text: 1
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -5624,7 +5632,7 @@ TextMesh:
   m_GameObject: {fileID: 1171092966}
   m_Text: 9
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -5728,7 +5736,7 @@ TextMesh:
   m_GameObject: {fileID: 1188937064}
   m_Text: 10
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -6524,7 +6532,7 @@ TextMesh:
   m_GameObject: {fileID: 1427500387}
   m_Text: 17
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -6595,8 +6603,8 @@ GameObject:
   m_Component:
   - component: {fileID: 1436080028}
   - component: {fileID: 1436080027}
-  - component: {fileID: 1436080026}
   - component: {fileID: 1436080025}
+  - component: {fileID: 1436080026}
   - component: {fileID: 1436080024}
   - component: {fileID: 1436080023}
   m_Layer: 8
@@ -6618,13 +6626,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7f99c1a086547be9841e7f9ed21dae0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.PlayerController
-  moveSpeed: 5
+  moveSpeed: 10
   acceleration: 25
   cameraTransform: {fileID: 330585546}
-  rollResponsiveness: 1.6
-  wallPushBoost: 0.5
+  gravityMultiplier: 2.5
+  groundStickStrength: 25
+  airControl: 0.2
   minWalkableNormalY: 0.6
   maxClimbHeight: -1.8
+  minRollSlopeAngle: 12
+  maxRollSlopeAngle: 38
+  rollResponsiveness: 1.2
+  heightTorqueMultiplier: 0.45
+  wallPushBoost: 0.8
+  minImpactSpeedForKick: 2
+  wallImpactKickStrength: 1.4
   icosahedronRigidbody: {fileID: 773711801}
   moveActionReference: {fileID: 0}
 --- !u!54 &1436080024
@@ -7812,7 +7828,7 @@ TextMesh:
   m_GameObject: {fileID: 1694294562}
   m_Text: 19
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -8202,7 +8218,7 @@ TextMesh:
   m_GameObject: {fileID: 1719101121}
   m_Text: 5
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -8484,7 +8500,7 @@ TextMesh:
   m_GameObject: {fileID: 1745983433}
   m_Text: 3
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -9266,7 +9282,7 @@ TextMesh:
   m_GameObject: {fileID: 1980101077}
   m_Text: 12
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -9370,7 +9386,7 @@ TextMesh:
   m_GameObject: {fileID: 1985396666}
   m_Text: 20
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -9474,7 +9490,7 @@ TextMesh:
   m_GameObject: {fileID: 2046051096}
   m_Text: 13
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1
@@ -9578,7 +9594,7 @@ TextMesh:
   m_GameObject: {fileID: 2048545782}
   m_Text: 16
   m_OffsetZ: 0
-  m_CharacterSize: 0.08
+  m_CharacterSize: 0.3
   m_LineSpacing: 1
   m_Anchor: 4
   m_Alignment: 1

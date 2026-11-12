@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
@@ -40,15 +41,39 @@ namespace LuckyNumbers.PhysicsPrototype
 
         private void Update()
         {
+            HandleModeToggleInput();
             UpdateStatusHUD();
+        }
+
+        private void HandleModeToggleInput()
+        {
+            if (controller == null) return;
+            Keyboard kb = Keyboard.current;
+            if (kb != null && (kb.mKey.wasPressedThisFrame || kb.tKey.wasPressedThisFrame))
+            {
+                controller.ToggleRollMode();
+            }
         }
 
         private void UpdateStatusHUD()
         {
             if (rollStatusText == null || controller == null) return;
 
-            string state = controller.IsRestingFlat ? "<color=#55ff88>RESTING FLAT</color>" : "<color=#ffcc44>ROLLING...</color>";
-            rollStatusText.text = $"<b>DND ROLL: #{controller.CurrentTopFaceNumber}</b>  ({state})\n<size=14><color=#dddddd>Floor Face: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}°</color></size>";
+            string modeName = controller.CurrentRollMode == RollMode.SmoothCenterRoll ? "Smooth Roll" : "Edge-Pivot Tumble";
+            float speed = controller.CurrentTravelVelocity.magnitude;
+
+            if (controller.IsRestingFlat)
+            {
+                rollStatusText.text = $"<b>DND ROLL: #{controller.CurrentTopFaceNumber}</b>  (<color=#55ff88>RESTING FLAT</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
+                                      $"<size=14><color=#dddddd>Floor Face: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
+            }
+            else
+            {
+                int effortPct = Mathf.RoundToInt(controller.CurrentRollEffort * 100f);
+                string aimText = controller.TargetTopFaceNumber > 0 ? $"Aiming: #{controller.TargetTopFaceNumber}" : "Tilting";
+                rollStatusText.text = $"<b>ROLLING...</b>  (<color=#ffcc44>{aimText} | Effort: {effortPct}%</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
+                                      $"<size=14><color=#dddddd>Current Top: #{controller.CurrentTopFaceNumber} | Floor: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
+            }
         }
 
         private void EnsureEventSystem()

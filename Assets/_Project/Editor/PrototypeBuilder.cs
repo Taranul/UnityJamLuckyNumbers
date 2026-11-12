@@ -53,9 +53,14 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
             if (icoController == null) icoController = icosahedron.AddComponent<IcosahedronController>();
             SerializedObject icoCtrlSo = new SerializedObject(icoController);
             icoCtrlSo.FindProperty("targetRigidbody").objectReferenceValue = icoRb;
+            icoCtrlSo.FindProperty("rollMode").enumValueIndex = 0; // SmoothCenterRoll
+            icoCtrlSo.FindProperty("enableWorldTravel").boolValue = true;
+            icoCtrlSo.FindProperty("tableFloorY").floatValue = -8.6f;
+            icoCtrlSo.FindProperty("outerFaceRadius").floatValue = 6.424f;
+            icoCtrlSo.FindProperty("travelSpeedMultiplier").floatValue = 1.0f;
             icoCtrlSo.FindProperty("rollAcceleration").floatValue = 16.0f;
             icoCtrlSo.FindProperty("angularDamping").floatValue = 2.0f;
-            icoCtrlSo.FindProperty("maxAngularVelocity").floatValue = 6.0f;
+            icoCtrlSo.FindProperty("maxAngularVelocity").floatValue = 3.5f;
             icoCtrlSo.FindProperty("settleStiffness").floatValue = 14.0f;
             icoCtrlSo.FindProperty("settleDamping").floatValue = 7.5f;
             icoCtrlSo.FindProperty("flatAngleThreshold").floatValue = 3.0f;
@@ -120,10 +125,18 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
 
             SerializedObject playerCtrlSo = new SerializedObject(playerCtrl);
             playerCtrlSo.FindProperty("icosahedronRigidbody").objectReferenceValue = icoRb;
-            playerCtrlSo.FindProperty("moveSpeed").floatValue = 5.0f;
+            playerCtrlSo.FindProperty("moveSpeed").floatValue = 10.0f;
             playerCtrlSo.FindProperty("acceleration").floatValue = 25.0f;
-            playerCtrlSo.FindProperty("rollResponsiveness").floatValue = 1.6f;
-            playerCtrlSo.FindProperty("wallPushBoost").floatValue = 0.5f;
+            playerCtrlSo.FindProperty("gravityMultiplier").floatValue = 2.5f;
+            playerCtrlSo.FindProperty("groundStickStrength").floatValue = 25.0f;
+            playerCtrlSo.FindProperty("airControl").floatValue = 0.2f;
+            playerCtrlSo.FindProperty("minRollSlopeAngle").floatValue = 12.0f;
+            playerCtrlSo.FindProperty("maxRollSlopeAngle").floatValue = 38.0f;
+            playerCtrlSo.FindProperty("rollResponsiveness").floatValue = 1.2f;
+            playerCtrlSo.FindProperty("heightTorqueMultiplier").floatValue = 0.45f;
+            playerCtrlSo.FindProperty("wallPushBoost").floatValue = 0.8f;
+            playerCtrlSo.FindProperty("minImpactSpeedForKick").floatValue = 2.0f;
+            playerCtrlSo.FindProperty("wallImpactKickStrength").floatValue = 1.4f;
             playerCtrlSo.FindProperty("minWalkableNormalY").floatValue = 0.60f;
             playerCtrlSo.FindProperty("maxClimbHeight").floatValue = -1.8f;
 
