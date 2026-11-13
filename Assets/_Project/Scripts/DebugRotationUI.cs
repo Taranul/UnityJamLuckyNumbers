@@ -2,38 +2,54 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
+using VContainer;
 
 namespace LuckyNumbers.PhysicsPrototype
 {
     /// <summary>
-    /// Builds and manages the Debug Canvas UI with four directional arrow buttons (↑, ↓, ←, →).
-    /// Handles press-and-hold interaction to control icosahedron rotation.
+    /// Manages the Debug HUD and interactive UI buttons for icosahedron rotation.
     /// </summary>
     public class DebugRotationUI : MonoBehaviour
     {
         [Header("Target")]
-        [SerializeField] private IcosahedronController controller;
+        [FormerlySerializedAs("controller")]
+        [SerializeField] private IcosahedronController _controller;
 
-        [Header("Button References (Optional if pre-constructed)")]
-        [SerializeField] private HoldButton upButton;
-        [SerializeField] private HoldButton downButton;
-        [SerializeField] private HoldButton leftButton;
-        [SerializeField] private HoldButton rightButton;
+        [Header("Button References")]
+        [FormerlySerializedAs("upButton")]
+        [SerializeField] private HoldButton _upButton;
+
+        [FormerlySerializedAs("downButton")]
+        [SerializeField] private HoldButton _downButton;
+
+        [FormerlySerializedAs("leftButton")]
+        [SerializeField] private HoldButton _leftButton;
+
+        [FormerlySerializedAs("rightButton")]
+        [SerializeField] private HoldButton _rightButton;
 
         [Header("Roll Status HUD")]
-        [SerializeField] private Text rollStatusText;
+        [FormerlySerializedAs("rollStatusText")]
+        [SerializeField] private Text _rollStatusText;
+
+        [Inject]
+        public void Construct(IcosahedronController controller)
+        {
+            _controller = controller;
+        }
 
         private void Awake()
         {
-            if (controller == null)
+            if (_controller == null)
             {
-                controller = FindFirstObjectByType<IcosahedronController>();
+                _controller = FindFirstObjectByType<IcosahedronController>();
             }
 
             EnsureEventSystem();
 
-            if (upButton == null || downButton == null || leftButton == null || rightButton == null || rollStatusText == null)
+            if (_upButton == null || _downButton == null || _leftButton == null || _rightButton == null || _rollStatusText == null)
             {
                 BuildUI();
             }
@@ -47,32 +63,32 @@ namespace LuckyNumbers.PhysicsPrototype
 
         private void HandleModeToggleInput()
         {
-            if (controller == null) return;
+            if (_controller == null) return;
             Keyboard kb = Keyboard.current;
             if (kb != null && (kb.mKey.wasPressedThisFrame || kb.tKey.wasPressedThisFrame))
             {
-                controller.ToggleRollMode();
+                _controller.ToggleRollMode();
             }
         }
 
         private void UpdateStatusHUD()
         {
-            if (rollStatusText == null || controller == null) return;
+            if (_rollStatusText == null || _controller == null) return;
 
-            string modeName = controller.CurrentRollMode == RollMode.SmoothCenterRoll ? "Smooth Roll" : "Edge-Pivot Tumble";
-            float speed = controller.CurrentTravelVelocity.magnitude;
+            string modeName = _controller.CurrentRollMode == RollMode.SmoothCenterRoll ? "Smooth Roll" : "Edge-Pivot Tumble";
+            float speed = _controller.CurrentTravelVelocity.magnitude;
 
-            if (controller.IsRestingFlat)
+            if (_controller.IsRestingFlat)
             {
-                rollStatusText.text = $"<b>DND ROLL: #{controller.CurrentTopFaceNumber}</b>  (<color=#55ff88>RESTING FLAT</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
-                                      $"<size=14><color=#dddddd>Floor Face: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
+                _rollStatusText.text = $"<b>DND ROLL: #{_controller.CurrentTopFaceNumber}</b>  (<color=#55ff88>RESTING FLAT</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
+                                      $"<size=14><color=#dddddd>Floor Face: #{_controller.CurrentBottomFaceNumber} | Tilt: {_controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
             }
             else
             {
-                int effortPct = Mathf.RoundToInt(controller.CurrentRollEffort * 100f);
-                string aimText = controller.TargetTopFaceNumber > 0 ? $"Aiming: #{controller.TargetTopFaceNumber}" : "Tilting";
-                rollStatusText.text = $"<b>ROLLING...</b>  (<color=#ffcc44>{aimText} | Effort: {effortPct}%</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
-                                      $"<size=14><color=#dddddd>Current Top: #{controller.CurrentTopFaceNumber} | Floor: #{controller.CurrentBottomFaceNumber} | Tilt: {controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
+                int effortPct = Mathf.RoundToInt(_controller.CurrentRollEffort * 100f);
+                string aimText = _controller.TargetTopFaceNumber > 0 ? $"Aiming: #{_controller.TargetTopFaceNumber}" : "Tilting";
+                _rollStatusText.text = $"<b>ROLLING...</b>  (<color=#ffcc44>{aimText} | Effort: {effortPct}%</color>) | <color=#66ddff>[{modeName} (Press 'M' to Toggle)]</color>\n" +
+                                      $"<size=14><color=#dddddd>Current Top: #{_controller.CurrentTopFaceNumber} | Floor: #{_controller.CurrentBottomFaceNumber} | Tilt: {_controller.CurrentTiltAngle:F0}° | Speed: {speed:F1} m/s</color></size>";
             }
         }
 
@@ -82,7 +98,7 @@ namespace LuckyNumbers.PhysicsPrototype
             if (es == null)
             {
                 GameObject esObj = new GameObject("EventSystem");
-                es = esObj.AddComponent<EventSystem>();
+                esObj.AddComponent<EventSystem>();
                 esObj.AddComponent<InputSystemUIInputModule>();
             }
             else if (es.GetComponent<InputSystemUIInputModule>() == null && es.GetComponent<StandaloneInputModule>() == null)
@@ -98,127 +114,162 @@ namespace LuckyNumbers.PhysicsPrototype
             if (canvas == null)
             {
                 canvas = gameObject.AddComponent<Canvas>();
-                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-                CanvasScaler scaler = gameObject.AddComponent<CanvasScaler>();
-                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-                scaler.referenceResolution = new Vector2(1920, 1080);
+            }
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+
+            CanvasScaler scaler = GetComponent<CanvasScaler>();
+            if (scaler == null)
+            {
+                scaler = gameObject.AddComponent<CanvasScaler>();
+            }
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            GraphicRaycaster raycaster = GetComponent<GraphicRaycaster>();
+            if (raycaster == null)
+            {
                 gameObject.AddComponent<GraphicRaycaster>();
             }
 
-            // Clean previous children if any
-            for (int i = transform.childCount - 1; i >= 0; i--)
+            Font standardFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (standardFont == null)
             {
-                if (Application.isPlaying)
-                {
-                    Destroy(transform.GetChild(i).gameObject);
-                }
-                else
-                {
-                    DestroyImmediate(transform.GetChild(i).gameObject);
-                }
+                standardFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
             }
 
-            // Top-Center Roll Status Banner
-            GameObject hudBanner = new GameObject("RollStatusBanner");
-            hudBanner.transform.SetParent(transform, false);
-            RectTransform hudRect = hudBanner.AddComponent<RectTransform>();
-            hudRect.anchorMin = new Vector2(0.5f, 1f);
-            hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -25f);
-            hudRect.sizeDelta = new Vector2(440f, 65f);
+            GameObject hudObj = GameObject.Find("RollStatusBanner");
+            if (hudObj == null)
+            {
+                hudObj = new GameObject("RollStatusBanner");
+                hudObj.transform.SetParent(transform, false);
+            }
 
-            Image hudBg = hudBanner.AddComponent<Image>();
-            hudBg.color = new Color(0.08f, 0.1f, 0.16f, 0.85f);
+            RectTransform hudRt = hudObj.GetComponent<RectTransform>();
+            if (hudRt == null) hudRt = hudObj.AddComponent<RectTransform>();
+            hudRt.anchorMin = new Vector2(0.5f, 1f);
+            hudRt.anchorMax = new Vector2(0.5f, 1f);
+            hudRt.pivot = new Vector2(0.5f, 1f);
+            hudRt.anchoredPosition = new Vector2(0f, -20f);
+            hudRt.sizeDelta = new Vector2(700f, 90f);
 
-            GameObject hudTextObj = new GameObject("Text");
-            hudTextObj.transform.SetParent(hudBanner.transform, false);
-            RectTransform textRt = hudTextObj.AddComponent<RectTransform>();
+            Image hudBg = hudObj.GetComponent<Image>();
+            if (hudBg == null) hudBg = hudObj.AddComponent<Image>();
+            hudBg.color = new Color(0.06f, 0.08f, 0.12f, 0.85f);
+
+            GameObject textObj = hudObj.transform.Find("Text")?.gameObject;
+            if (textObj == null)
+            {
+                textObj = new GameObject("Text");
+                textObj.transform.SetParent(hudObj.transform, false);
+            }
+            RectTransform textRt = textObj.GetComponent<RectTransform>();
+            if (textRt == null) textRt = textObj.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.sizeDelta = new Vector2(-20f, -10f);
+
+            Text textComp = textObj.GetComponent<Text>();
+            if (textComp == null) textComp = textObj.AddComponent<Text>();
+            textComp.font = standardFont;
+            textComp.fontSize = 20;
+            textComp.alignment = TextAnchor.MiddleCenter;
+            textComp.color = Color.white;
+            textComp.supportRichText = true;
+            _rollStatusText = textComp;
+
+            GameObject panel = transform.Find("ControlPadPanel")?.gameObject;
+            if (panel == null)
+            {
+                panel = new GameObject("ControlPadPanel");
+                panel.transform.SetParent(transform, false);
+            }
+
+            RectTransform panelRt = panel.GetComponent<RectTransform>();
+            if (panelRt == null) panelRt = panel.AddComponent<RectTransform>();
+            panelRt.anchorMin = new Vector2(1f, 0f);
+            panelRt.anchorMax = new Vector2(1f, 0f);
+            panelRt.pivot = new Vector2(1f, 0f);
+            panelRt.anchoredPosition = new Vector2(-40f, 40f);
+            panelRt.sizeDelta = new Vector2(240f, 240f);
+
+            Image panelBg = panel.GetComponent<Image>();
+            if (panelBg == null) panelBg = panel.AddComponent<Image>();
+            panelBg.color = new Color(0.08f, 0.08f, 0.12f, 0.75f);
+
+            GameObject titleObj = panel.transform.Find("Title")?.gameObject;
+            if (titleObj == null)
+            {
+                titleObj = new GameObject("Title");
+                titleObj.transform.SetParent(panel.transform, false);
+            }
+            RectTransform titleRt = titleObj.GetComponent<RectTransform>();
+            if (titleRt == null) titleRt = titleObj.AddComponent<RectTransform>();
+            titleRt.anchorMin = new Vector2(0f, 1f);
+            titleRt.anchorMax = new Vector2(1f, 1f);
+            titleRt.pivot = new Vector2(0.5f, 1f);
+            titleRt.anchoredPosition = new Vector2(0f, -8f);
+            titleRt.sizeDelta = new Vector2(0f, 24f);
+
+            Text titleText = titleObj.GetComponent<Text>();
+            if (titleText == null) titleText = titleObj.AddComponent<Text>();
+            titleText.font = standardFont;
+            titleText.text = "TILT / ROLL (HOLD)";
+            titleText.fontSize = 13;
+            titleText.fontStyle = FontStyle.Bold;
+            titleText.alignment = TextAnchor.MiddleCenter;
+            titleText.color = new Color(0.85f, 0.85f, 0.9f);
+
+            float centerOffset = 55f;
+            float btnSize = 52f;
+
+            _upButton = CreateArrowButton(panel.transform, "UpButton", new Vector2(0f, centerOffset), new Vector2(btnSize, btnSize), "▲", Vector2.up, standardFont);
+            _downButton = CreateArrowButton(panel.transform, "DownButton", new Vector2(0f, -centerOffset), new Vector2(btnSize, btnSize), "▼", Vector2.down, standardFont);
+            _leftButton = CreateArrowButton(panel.transform, "LeftButton", new Vector2(-centerOffset, 0f), new Vector2(btnSize, btnSize), "◀", Vector2.left, standardFont);
+            _rightButton = CreateArrowButton(panel.transform, "RightButton", new Vector2(centerOffset, 0f), new Vector2(btnSize, btnSize), "▶", Vector2.right, standardFont);
+        }
+
+        private HoldButton CreateArrowButton(Transform parent, string name, Vector2 pos, Vector2 size, string label, Vector2 dir, Font font)
+        {
+            Transform existing = parent.Find(name);
+            GameObject btnObj = (existing != null) ? existing.gameObject : new GameObject(name);
+            btnObj.transform.SetParent(parent, false);
+
+            RectTransform rt = btnObj.GetComponent<RectTransform>();
+            if (rt == null) rt = btnObj.AddComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = pos;
+            rt.sizeDelta = size;
+
+            Image img = btnObj.GetComponent<Image>();
+            if (img == null) img = btnObj.AddComponent<Image>();
+            img.color = new Color(0.2f, 0.25f, 0.35f, 0.95f);
+
+            HoldButton holdBtn = btnObj.GetComponent<HoldButton>();
+            if (holdBtn == null) holdBtn = btnObj.AddComponent<HoldButton>();
+            holdBtn.Initialize(_controller, dir);
+
+            GameObject textObj = btnObj.transform.Find("Text")?.gameObject;
+            if (textObj == null)
+            {
+                textObj = new GameObject("Text");
+                textObj.transform.SetParent(btnObj.transform, false);
+            }
+            RectTransform textRt = textObj.GetComponent<RectTransform>();
+            if (textRt == null) textRt = textObj.AddComponent<RectTransform>();
             textRt.anchorMin = Vector2.zero;
             textRt.anchorMax = Vector2.one;
             textRt.sizeDelta = Vector2.zero;
 
-            rollStatusText = hudTextObj.AddComponent<Text>();
-            rollStatusText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
-            rollStatusText.fontSize = 20;
-            rollStatusText.alignment = TextAnchor.MiddleCenter;
-            rollStatusText.color = Color.white;
-            rollStatusText.text = "DND ROLL: #20 (RESTING FLAT)\n<size=14><color=#dddddd>Floor Face: #1 | Tilt: 0°</color></size>";
-
-            // Panel container in bottom-right corner
-            GameObject panel = new GameObject("ControlPadPanel");
-            panel.transform.SetParent(transform, false);
-            RectTransform panelRect = panel.AddComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(1f, 0f);
-            panelRect.anchorMax = new Vector2(1f, 0f);
-            panelRect.pivot = new Vector2(1f, 0f);
-            panelRect.anchoredPosition = new Vector2(-40f, 40f);
-            panelRect.sizeDelta = new Vector2(260f, 260f);
-
-            Image panelImage = panel.AddComponent<Image>();
-            panelImage.color = new Color(0.1f, 0.12f, 0.18f, 0.75f);
-
-            // Title label
-            GameObject titleObj = new GameObject("Title");
-            titleObj.transform.SetParent(panel.transform, false);
-            RectTransform titleRect = titleObj.AddComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0.5f, 1f);
-            titleRect.anchorMax = new Vector2(0.5f, 1f);
-            titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.anchoredPosition = new Vector2(0f, -8f);
-            titleRect.sizeDelta = new Vector2(240f, 30f);
-
-            Text titleText = titleObj.AddComponent<Text>();
-            titleText.text = "ROTATION CONTROLS";
-            titleText.alignment = TextAnchor.MiddleCenter;
-            titleText.fontSize = 14;
-            titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
-            titleText.color = new Color(0.9f, 0.9f, 0.9f, 1f);
-
-            float btnSize = 60f;
-            float centerOffsetY = -20f;
-
-            // Up Button
-            upButton = CreateArrowButton(panel.transform, "UpButton", "▲", new Vector2(0f, 65f + centerOffsetY), btnSize, new Vector2(0f, 1f));
-            // Down Button
-            downButton = CreateArrowButton(panel.transform, "DownButton", "▼", new Vector2(0f, -65f + centerOffsetY), btnSize, new Vector2(0f, -1f));
-            // Left Button
-            leftButton = CreateArrowButton(panel.transform, "LeftButton", "◀", new Vector2(-65f, centerOffsetY), btnSize, new Vector2(-1f, 0f));
-            // Right Button
-            rightButton = CreateArrowButton(panel.transform, "RightButton", "▶", new Vector2(65f, centerOffsetY), btnSize, new Vector2(1f, 0f));
-        }
-
-        private HoldButton CreateArrowButton(Transform parent, string name, string label, Vector2 position, float size, Vector2 direction)
-        {
-            GameObject btnObj = new GameObject(name);
-            btnObj.transform.SetParent(parent, false);
-
-            RectTransform rect = btnObj.AddComponent<RectTransform>();
-            rect.anchorMin = new Vector2(0.5f, 0.5f);
-            rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.pivot = new Vector2(0.5f, 0.5f);
-            rect.anchoredPosition = position;
-            rect.sizeDelta = new Vector2(size, size);
-
-            Image img = btnObj.AddComponent<Image>();
-            img.color = new Color(0.25f, 0.35f, 0.55f, 0.9f);
-
-            HoldButton holdBtn = btnObj.AddComponent<HoldButton>();
-            holdBtn.Initialize(controller, direction);
-
-            // Text label
-            GameObject textObj = new GameObject("Text");
-            textObj.transform.SetParent(btnObj.transform, false);
-            RectTransform textRect = textObj.AddComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.sizeDelta = Vector2.zero;
-
-            Text txt = textObj.AddComponent<Text>();
+            Text txt = textObj.GetComponent<Text>();
+            if (txt == null) txt = textObj.AddComponent<Text>();
+            txt.font = font;
             txt.text = label;
-            txt.alignment = TextAnchor.MiddleCenter;
             txt.fontSize = 24;
-            txt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf") ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+            txt.alignment = TextAnchor.MiddleCenter;
             txt.color = Color.white;
 
             return holdBtn;

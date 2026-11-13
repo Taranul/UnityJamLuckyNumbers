@@ -1,31 +1,34 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Serialization;
 
 namespace LuckyNumbers.PhysicsPrototype
 {
     /// <summary>
-    /// Handles continuous press-and-hold for UI directional arrow buttons.
-    /// Resets if released or if the pointer exits the button area to prevent stuck input.
+    /// Handles continuous press-and-hold interaction for directional UI arrow buttons.
     /// </summary>
     public class HoldButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler, IPointerExitHandler
     {
-        [SerializeField] private Vector2 directionVector = Vector2.zero;
-        [SerializeField] private IcosahedronController controller;
+        [FormerlySerializedAs("directionVector")]
+        [SerializeField] private Vector2 _directionVector = Vector2.zero;
+
+        [FormerlySerializedAs("controller")]
+        [SerializeField] private IcosahedronController _controller;
 
         private bool _isHeld;
 
         public void Initialize(IcosahedronController targetController, Vector2 direction)
         {
-            controller = targetController;
-            directionVector = direction;
+            _controller = targetController;
+            _directionVector = direction;
         }
 
         public void OnPointerDown(PointerEventData eventData)
         {
             _isHeld = true;
-            if (controller != null)
+            if (_controller != null)
             {
-                controller.SetDirectionHeld(directionVector, true);
+                _controller.SetDirectionHeld(_directionVector, true);
             }
         }
 
@@ -49,9 +52,9 @@ namespace LuckyNumbers.PhysicsPrototype
             if (_isHeld)
             {
                 _isHeld = false;
-                if (controller != null)
+                if (_controller != null)
                 {
-                    controller.SetDirectionHeld(directionVector, false);
+                    _controller.SetDirectionHeld(_directionVector, false);
                 }
             }
         }
