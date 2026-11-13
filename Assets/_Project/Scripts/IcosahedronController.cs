@@ -93,6 +93,7 @@ namespace LuckyNumbers.PhysicsPrototype
         public float CurrentRollEffort { get; private set; } = 0f;
         public float CurrentTiltAngle { get; private set; } = 0f;
         public bool IsRestingFlat { get; private set; } = true;
+        public bool IsGroundedOnTable => _isGroundedOnTable;
 
         /// <summary>
         /// Fired when the die lands flat onto a new face.
@@ -106,6 +107,7 @@ namespace LuckyNumbers.PhysicsPrototype
         private Vector3 _playerRollAxis = Vector3.zero;
         private float _playerRollSpeed;
         private bool _wasRestingFlat = true;
+        private bool _isGroundedOnTable = true;
         private readonly HashSet<Vector2> _activePointerDirections = new HashSet<Vector2>();
 
         private void Awake()
@@ -118,6 +120,11 @@ namespace LuckyNumbers.PhysicsPrototype
             var faceData = IcosahedronGenerator.ComputeCanonicalFaceData();
             _canonicalFaceNormals = faceData.normals;
             _canonicalFaceNumbers = faceData.numbers;
+
+            float initialTargetY = _tableFloorY + _outerFaceRadius;
+            _isGroundedOnTable = transform.position.y <= (initialTargetY + 0.15f);
+            _wasRestingFlat = _isGroundedOnTable;
+            IsRestingFlat = _isGroundedOnTable;
 
             ConfigureRigidbody();
         }
@@ -256,7 +263,7 @@ namespace LuckyNumbers.PhysicsPrototype
 
             CurrentTiltAngle = Mathf.Acos(Mathf.Clamp(maxBottomDot, -1f, 1f)) * Mathf.Rad2Deg;
 
-            bool nowFlat = CurrentTiltAngle < _flatAngleThreshold && _currentRollAngularVel.sqrMagnitude < 0.05f;
+            bool nowFlat = _isGroundedOnTable && CurrentTiltAngle < _flatAngleThreshold && _currentRollAngularVel.sqrMagnitude < 0.05f;
 
             if (!_wasRestingFlat && nowFlat)
             {
@@ -363,7 +370,7 @@ namespace LuckyNumbers.PhysicsPrototype
                     _currentRollAngularVel = Vector3.zero;
                 }
 
-                if (_enableTableRestingStability && _canonicalFaceNormals != null && _canonicalFaceNormals.Length > 0 && currentSpeed < 0.8f)
+                if (_isGroundedOnTable && _enableTableRestingStability && _canonicalFaceNormals != null && _canonicalFaceNormals.Length > 0 && currentSpeed < 0.8f)
                 {
                     ApplyTableRestingStability(dt);
                 }
@@ -380,7 +387,24 @@ namespace LuckyNumbers.PhysicsPrototype
                     ? _tableFloorY + Mathf.Lerp(_outerFaceRadius, dynamicRadius, 0.25f)
                     : _tableFloorY + dynamicRadius;
 
-                float yVel = (targetY - transform.position.y) * 12.0f;
+                float currentY = transform.position.y;
+                _isGroundedOnTable = currentY <= (targetY + 0.15f);
+
+                float yVel;
+                if (!_isGroundedOnTable)
+                {
+                    yVel = _targetRigidbody.linearVelocity.y;
+                }
+                else
+                {
+                    float heightDiff = targetY - currentY;
+                    float surfaceYVel = heightDiff * 12.0f;
+                    yVel = Mathf.MoveTowards(_targetRigidbody.linearVelocity.y, surfaceYVel, 60.0f * dt);
+                    if (currentY < targetY)
+                    {
+                        yVel = Mathf.Max(yVel, surfaceYVel);
+                    }
+                }
 
                 if (isActivelyRolling || _currentRollAngularVel.sqrMagnitude > 0.01f)
                 {
@@ -389,7 +413,7 @@ namespace LuckyNumbers.PhysicsPrototype
                 else
                 {
                     Vector3 horizVel = new Vector3(_targetRigidbody.linearVelocity.x, 0f, _targetRigidbody.linearVelocity.z);
-                    Vector3 dampedHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, 15f * dt);
+                    Vector3 dampedHoriz = _isGroundedOnTable ? Vector3.MoveTowards(horizVel, Vector3.zero, 15f * dt) : horizVel;
                     _targetRigidbody.linearVelocity = new Vector3(dampedHoriz.x, yVel, dampedHoriz.z);
                 }
 
