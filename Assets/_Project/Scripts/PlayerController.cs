@@ -151,7 +151,7 @@ namespace LuckyNumbers.PhysicsPrototype
             // Stabilize solver contact resolution and prevent depenetration popping
             _rigidbody.solverIterations = 16;
             _rigidbody.solverVelocityIterations = 8;
-            _rigidbody.maxDepenetrationVelocity = 8.0f;
+            _rigidbody.maxDepenetrationVelocity = 4.0f;
 
             // Frictionless "soap" physics material to glide smoothly in corners and slopes
             if (_capsuleCollider != null)
@@ -401,55 +401,64 @@ namespace LuckyNumbers.PhysicsPrototype
             // --- 5. 3-Tier Die Rolling (Surface Angle, Relative Climb Height, Wall Push & Impact) ---
             if (_icoController != null)
             {
-                // Tier 1: Surface Normal Angle (0 on flat floor < minRollSlopeAngle, scales up on slope)
-                float currentSlopeAngle = Vector3.Angle(_floorNormal, Vector3.up);
-                float angleFactor = 0f;
-                if (isWalkableSlope && currentSlopeAngle > minRollSlopeAngle)
+                // Never apply player roll rotation logic to the die when the player does not press any input!
+                // Prevents accidental rotation or rolling when bouncing, falling, or standing still.
+                if (_moveInput.sqrMagnitude < 0.001f || _desiredDirection.sqrMagnitude < 0.001f)
                 {
-                    angleFactor = Mathf.InverseLerp(minRollSlopeAngle, maxRollSlopeAngle, currentSlopeAngle);
-                }
-
-                // Tier 2: Wall Push Factor (active when walking/pushing into an inclined side wall or corner)
-                float wallPushFactor = _isPushingWall ? (_wallPushDot * wallPushBoost * _moveInput.magnitude) : 0f;
-                if (_isPushingWall && _moveInput.sqrMagnitude > 0.1f)
-                {
-                    wallPushFactor = Mathf.Max(wallPushFactor, 0.6f * _moveInput.magnitude);
-                }
-
-                // Base Drive: climbing slope OR pushing wall drives the roll!
-                float baseDrive = Mathf.Max(angleFactor, wallPushFactor);
-                if (angleFactor > 0.05f && wallPushFactor > 0.05f)
-                {
-                    baseDrive = angleFactor + wallPushFactor;
-                }
-
-                // Maintain roll momentum when actively pushing movement keys
-                if (_moveInput.sqrMagnitude > 0.1f && (_icoController.CurrentTiltAngle > 4.0f || _isPushingWall))
-                {
-                    baseDrive = Mathf.Max(baseDrive, 0.55f);
-                }
-
-                // Tier 3: Height leverage multiplier (the higher up the player climbs, the more torque)
-                float lowestFloorY = _icoController.LowestInteriorFloorY;
-                float climbHeight = Mathf.Max(0f, transform.position.y - (lowestFloorY + 1.0f));
-                float heightMultiplier = 1.0f + (climbHeight * heightTorqueMultiplier);
-
-                float totalEffort = baseDrive * heightMultiplier;
-
-                if (totalEffort > 0.02f && isContacting && _desiredDirection.sqrMagnitude > 0.001f)
-                {
-                    Vector3 horizDir = new Vector3(_desiredDirection.x, 0f, _desiredDirection.z).normalized;
-                    Vector3 rollAxis = Vector3.Cross(Vector3.up, horizDir);
-
-                    float floorRadius = 6.046f;
-                    float baseAngularSpeed = (moveSpeed / floorRadius) * rollResponsiveness * totalEffort;
-                    baseAngularSpeed = Mathf.Min(baseAngularSpeed, 4.0f);
-
-                    _icoController.DriveRollFromPlayer(rollAxis, baseAngularSpeed, totalEffort, horizDir);
+                    _icoController.StopRollFromPlayer();
                 }
                 else
                 {
-                    _icoController.StopRollFromPlayer();
+                    // Tier 1: Surface Normal Angle (0 on flat floor < minRollSlopeAngle, scales up on slope)
+                    float currentSlopeAngle = Vector3.Angle(_floorNormal, Vector3.up);
+                    float angleFactor = 0f;
+                    if (isWalkableSlope && currentSlopeAngle > minRollSlopeAngle)
+                    {
+                        angleFactor = Mathf.InverseLerp(minRollSlopeAngle, maxRollSlopeAngle, currentSlopeAngle);
+                    }
+
+                    // Tier 2: Wall Push Factor (active when walking/pushing into an inclined side wall or corner)
+                    float wallPushFactor = _isPushingWall ? (_wallPushDot * wallPushBoost * _moveInput.magnitude) : 0f;
+                    if (_isPushingWall && _moveInput.sqrMagnitude > 0.1f)
+                    {
+                        wallPushFactor = Mathf.Max(wallPushFactor, 0.6f * _moveInput.magnitude);
+                    }
+
+                    // Base Drive: climbing slope OR pushing wall drives the roll!
+                    float baseDrive = Mathf.Max(angleFactor, wallPushFactor);
+                    if (angleFactor > 0.05f && wallPushFactor > 0.05f)
+                    {
+                        baseDrive = angleFactor + wallPushFactor;
+                    }
+
+                    // Maintain roll momentum when actively pushing movement keys
+                    if (_moveInput.sqrMagnitude > 0.1f && (_icoController.CurrentTiltAngle > 4.0f || _isPushingWall))
+                    {
+                        baseDrive = Mathf.Max(baseDrive, 0.55f);
+                    }
+
+                    // Tier 3: Height leverage multiplier (the higher up the player climbs, the more torque)
+                    float lowestFloorY = _icoController.LowestInteriorFloorY;
+                    float climbHeight = Mathf.Max(0f, transform.position.y - (lowestFloorY + 1.0f));
+                    float heightMultiplier = 1.0f + (climbHeight * heightTorqueMultiplier);
+
+                    float totalEffort = baseDrive * heightMultiplier;
+
+                    if (totalEffort > 0.02f && isContacting)
+                    {
+                        Vector3 horizDir = new Vector3(_desiredDirection.x, 0f, _desiredDirection.z).normalized;
+                        Vector3 rollAxis = Vector3.Cross(Vector3.up, horizDir);
+
+                        float floorRadius = 6.046f;
+                        float baseAngularSpeed = (moveSpeed / floorRadius) * rollResponsiveness * totalEffort;
+                        baseAngularSpeed = Mathf.Min(baseAngularSpeed, 4.0f);
+
+                        _icoController.DriveRollFromPlayer(rollAxis, baseAngularSpeed, totalEffort, horizDir);
+                    }
+                    else
+                    {
+                        _icoController.StopRollFromPlayer();
+                    }
                 }
             }
 
@@ -467,6 +476,10 @@ namespace LuckyNumbers.PhysicsPrototype
         {
             if (_icoController == null) return;
 
+            // Never rotate or kick the die without active player movement input!
+            // Prevents accidental rotation and rolling when bouncing or falling inside the die.
+            if (_moveInput.sqrMagnitude < 0.05f || _desiredDirection.sqrMagnitude < 0.01f) return;
+
             Rigidbody otherRb = collision.rigidbody ?? collision.gameObject.GetComponentInParent<Rigidbody>();
             if (otherRb != icosahedronRigidbody) return;
 
@@ -481,13 +494,17 @@ namespace LuckyNumbers.PhysicsPrototype
                 if (contact.normal.y < 0.65f)
                 {
                     Vector3 hitDirection = -contact.normal;
-                    Vector3 horizHit = new Vector3(hitDirection.x, 0f, hitDirection.z);
-                    if (horizHit.sqrMagnitude > 0.01f)
+                    // Only kick if the player is actively pressing input TOWARDS this wall
+                    if (Vector3.Dot(_desiredDirection, hitDirection) > 0.25f)
                     {
-                        Vector3 rollAxis = Vector3.Cross(Vector3.up, horizHit.normalized);
-                        float kickImpulse = (impactSpeed - minImpactSpeedForKick) * wallImpactKickStrength;
-                        _icoController.ApplyWallImpactKick(rollAxis, kickImpulse);
-                        break;
+                        Vector3 horizHit = new Vector3(hitDirection.x, 0f, hitDirection.z);
+                        if (horizHit.sqrMagnitude > 0.01f)
+                        {
+                            Vector3 rollAxis = Vector3.Cross(Vector3.up, horizHit.normalized);
+                            float kickImpulse = (impactSpeed - minImpactSpeedForKick) * wallImpactKickStrength;
+                            _icoController.ApplyWallImpactKick(rollAxis, kickImpulse);
+                            break;
+                        }
                     }
                 }
             }
@@ -544,6 +561,16 @@ namespace LuckyNumbers.PhysicsPrototype
                 // Record for soap-like deflection and wall pushing
                 if (contact.normal.y < 0.85f)
                 {
+                    // If no movement input is active, absorb wall rebound velocity to prevent pinball bouncing inside the die
+                    if (_moveInput.sqrMagnitude < 0.01f)
+                    {
+                        float normalSpeed = Vector3.Dot(_rigidbody.linearVelocity, contact.normal);
+                        if (normalSpeed < 0f)
+                        {
+                            _rigidbody.linearVelocity -= contact.normal * (normalSpeed * 0.85f);
+                        }
+                    }
+
                     bool isDuplicate = false;
                     for (int w = 0; w < _wallNormals.Count; w++)
                     {

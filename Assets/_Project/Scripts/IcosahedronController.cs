@@ -210,6 +210,10 @@ namespace LuckyNumbers.PhysicsPrototype
         /// </summary>
         public void ApplyWallImpactKick(Vector3 rollAxis, float angularImpulse)
         {
+            // Only apply impact kicks if the player is actively providing roll input!
+            // Prevents accidental rotation from passive player bouncing or falling.
+            if (!_isPlayerRolling) return;
+
             if (rollAxis.sqrMagnitude > 0.001f && angularImpulse > 0.01f)
             {
                 _currentRollAngularVel += rollAxis.normalized * angularImpulse;
