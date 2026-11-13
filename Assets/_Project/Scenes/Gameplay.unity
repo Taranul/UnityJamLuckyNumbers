@@ -6206,7 +6206,7 @@ MonoBehaviour:
   cameraTransform: {fileID: 330585546}
   gravityMultiplier: 2.5
   groundStickStrength: 20
-  airControl: 0.2
+  airControl: 1
   minWalkableNormalY: 0.55
   maxClimbHeight: -1.8
   minRollSlopeAngle: 10

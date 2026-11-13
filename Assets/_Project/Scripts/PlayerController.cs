@@ -32,7 +32,7 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private float _groundStickStrength = 25.0f;
 
         [FormerlySerializedAs("airControl")]
-        [SerializeField] private float _airControl = 0.2f;
+        [SerializeField] private float _airControl = 1.0f;
 
         [FormerlySerializedAs("minWalkableNormalY")]
         [SerializeField] private float _minWalkableNormalY = 0.60f;
@@ -357,17 +357,30 @@ namespace LuckyNumbers.PhysicsPrototype
                     }
                 }
 
-                Vector3 moveOnSlope = isWalkableSlope
-                    ? Vector3.ProjectOnPlane(effectiveMoveDir, _floorNormal).normalized
-                    : effectiveMoveDir;
+                if (isWalkableSlope)
+                {
+                    Vector3 moveOnSlope = Vector3.ProjectOnPlane(effectiveMoveDir, _floorNormal).normalized;
+                    Vector3 targetHorizontalVel = icoHorizVel + moveOnSlope * (_moveInput.magnitude * _moveSpeed);
+                    Vector3 horizDifference = targetHorizontalVel - currentHorizontalVel;
+                    Vector3 moveForce = horizDifference * _acceleration;
 
-                Vector3 targetHorizontalVel = icoHorizVel + moveOnSlope * (_moveInput.magnitude * _moveSpeed);
-                Vector3 horizDifference = targetHorizontalVel - currentHorizontalVel;
+                    _rigidbody.AddForce(new Vector3(moveForce.x, moveOnSlope.y * _acceleration * 0.5f, moveForce.z), ForceMode.Acceleration);
+                }
+                else
+                {
+                    Vector3 targetHorizontalVel = icoHorizVel + effectiveMoveDir * (_moveInput.magnitude * _moveSpeed);
+                    Vector3 relCurrent = currentHorizontalVel - icoHorizVel;
+                    Vector3 relTarget = effectiveMoveDir * (_moveInput.magnitude * _moveSpeed);
 
-                float currentAccel = isContacting ? _acceleration : (_acceleration * _airControl);
-                Vector3 moveForce = horizDifference * currentAccel;
+                    float airAccel = _acceleration * Mathf.Max(1.0f, _airControl);
+                    if (Vector3.Dot(relCurrent, relTarget) < 0f)
+                    {
+                        airAccel *= 1.5f;
+                    }
 
-                _rigidbody.AddForce(new Vector3(moveForce.x, moveOnSlope.y * currentAccel * 0.5f, moveForce.z), ForceMode.Acceleration);
+                    Vector3 newHorizVel = Vector3.MoveTowards(currentHorizontalVel, targetHorizontalVel, airAccel * Time.fixedDeltaTime);
+                    _rigidbody.linearVelocity = new Vector3(newHorizVel.x, currentVelocity.y, newHorizVel.z);
+                }
 
                 if (effectiveMoveDir.sqrMagnitude > 0.01f)
                 {
