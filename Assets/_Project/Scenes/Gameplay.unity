@@ -893,7 +893,7 @@ MeshCollider:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 116005461}
-  m_Material: {fileID: 13400000, guid: e97fee62faad4cf7a6a4868cde478650, type: 2}
+  m_Material: {fileID: 13400000, guid: d71a638a164f434a9497e096f9905f32, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -1248,8 +1248,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50f7766274cc4accac6fd46bd1e6c697, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.HoldButton
-  directionVector: {x: -1, y: 0}
-  controller: {fileID: 773711800}
+  _directionVector: {x: -1, y: 0}
+  _controller: {fileID: 773711800}
 --- !u!1 &183933236
 GameObject:
   m_ObjectHideFlags: 0
@@ -1736,8 +1736,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50f7766274cc4accac6fd46bd1e6c697, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.HoldButton
-  directionVector: {x: 0, y: -1}
-  controller: {fileID: 773711800}
+  _directionVector: {x: 0, y: -1}
+  _controller: {fileID: 773711800}
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
@@ -1888,18 +1888,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 46a7a09c1e554ec1ad053d4c51299219, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.CameraController
-  target: {fileID: 1436080028}
-  lookOffset: {x: 0, y: 1.2, z: 0}
-  distance: 18
-  minDistance: 1
-  maxDistance: 35
-  zoomSensitivity: 0.1
-  mouseSensitivity: 2
-  minPitch: -40
-  maxPitch: 85
-  positionSmoothTime: 0.08
-  landingShakeDuration: 0.18
-  landingShakeMagnitude: 0.28
+  _target: {fileID: 1436080028}
+  _lookOffset: {x: 0, y: 1.2, z: 0}
+  _distance: 18
+  _minDistance: 1
+  _maxDistance: 35
+  _zoomSensitivity: 0.1
+  _mouseSensitivity: 2
+  _minPitch: -40
+  _maxPitch: 85
+  _positionSmoothTime: 0.08
+  _landingShakeDuration: 0.18
+  _landingShakeMagnitude: 0.28
 --- !u!1 &360198083
 GameObject:
   m_ObjectHideFlags: 0
@@ -4011,12 +4011,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6f3ca6b147ff4eb0a0c11c74796e8f67, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.DebugRotationUI
-  controller: {fileID: 773711800}
-  upButton: {fileID: 1373860860}
-  downButton: {fileID: 280499777}
-  leftButton: {fileID: 177124545}
-  rightButton: {fileID: 1462213750}
-  rollStatusText: {fileID: 269987051}
+  _controller: {fileID: 773711800}
+  _upButton: {fileID: 1373860860}
+  _downButton: {fileID: 280499777}
+  _leftButton: {fileID: 177124545}
+  _rightButton: {fileID: 1462213750}
+  _rollStatusText: {fileID: 269987051}
 --- !u!224 &773419484
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4071,25 +4071,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1d25f92a2ed64d10b14e0c34c7826685, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.IcosahedronController
-  targetRigidbody: {fileID: 773711801}
-  rollAcceleration: 24
-  reverseBrakeDeceleration: 30
-  steeringTurnRate: 200
-  coastFriction: 3.5
-  maxRollSpeed: 3.5
-  angularDamping: 1.5
-  maxAngularVelocity: 4
-  rollMode: 0
-  enableWorldTravel: 1
-  tableFloorY: -8.6
-  outerFaceRadius: 6.424
-  travelSpeedMultiplier: 1
-  enableTableRestingStability: 1
-  settleStiffness: 14
-  settleDamping: 7.5
-  flatAngleThreshold: 3
-  enableKeyboardDebug: 1
-  debugRotationSpeed: 2.5
+  _targetRigidbody: {fileID: 773711801}
+  _rollAcceleration: 24
+  _reverseBrakeDeceleration: 30
+  _steeringTurnRate: 200
+  _coastFriction: 3.5
+  _maxRollSpeed: 3.5
+  _angularDamping: 1.5
+  _maxAngularVelocity: 4
+  _rollMode: 0
+  _enableWorldTravel: 1
+  _tableFloorY: -8.6
+  _outerFaceRadius: 6.424
+  _travelSpeedMultiplier: 1
+  _enableTableRestingStability: 1
+  _settleStiffness: 14
+  _settleDamping: 7.5
+  _flatAngleThreshold: 6
+  _enableKeyboardDebug: 1
+  _debugRotationSpeed: 2.5
 --- !u!54 &773711801
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -4098,7 +4098,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 773711799}
   serializedVersion: 5
-  m_Mass: 200
+  m_Mass: 50000
   m_LinearDamping: 0
   m_AngularDamping: 1.5
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -4110,7 +4110,7 @@ Rigidbody:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_ImplicitCom: 1
+  m_ImplicitCom: 0
   m_ImplicitTensor: 1
   m_UseGravity: 1
   m_IsKinematic: 0
@@ -4193,6 +4193,9 @@ MonoBehaviour:
   exteriorMaterial: {fileID: 2100000, guid: 9d988dfab43945c1a5215739cbf1e2ec, type: 2}
   edgeMaterial: {fileID: 2100000, guid: 4f5b842d1d894a9cba3e747bdaccad46, type: 2}
   interiorPhysicMaterial: {fileID: 13400000, guid: e97fee62faad4cf7a6a4868cde478650, type: 2}
+  exteriorPhysicMaterial: {fileID: 13400000, guid: d71a638a164f434a9497e096f9905f32, type: 2}
+  useSphericalExteriorCollider: 1
+  sphericalColliderRadius: 6.424
   showDndNumbers: 1
   showEdgeFrames: 1
   exteriorLayerName: ExteriorShell
@@ -4859,6 +4862,58 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
+--- !u!1 &888880001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 888880002}
+  - component: {fileID: 888880003}
+  m_Layer: 0
+  m_Name: GameLifetimeScope
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &888880002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 888880001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &888880003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 888880001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.GameLifetimeScope
+  parentReference:
+    TypeName: 
+  autoRun: 1
+  autoInjectGameObjects: []
+  _icosahedronController: {fileID: 773711800}
+  _playerController: {fileID: 1436080023}
+  _cameraController: {fileID: 330585548}
+  _debugRotationUI: {fileID: 773419483}
 --- !u!43 &960130404
 Mesh:
   m_ObjectHideFlags: 0
@@ -5909,8 +5964,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50f7766274cc4accac6fd46bd1e6c697, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.HoldButton
-  directionVector: {x: 0, y: 1}
-  controller: {fileID: 773711800}
+  _directionVector: {x: 0, y: 1}
+  _controller: {fileID: 773711800}
 --- !u!1 &1393427005
 GameObject:
   m_ObjectHideFlags: 0
@@ -6201,23 +6256,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b7f99c1a086547be9841e7f9ed21dae0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.PlayerController
-  moveSpeed: 10
-  acceleration: 30
-  cameraTransform: {fileID: 330585546}
-  gravityMultiplier: 2.5
-  groundStickStrength: 20
-  airControl: 1
-  minWalkableNormalY: 0.55
-  maxClimbHeight: -1.8
-  minRollSlopeAngle: 10
-  maxRollSlopeAngle: 35
-  heightTorqueMultiplier: 0.5
-  rollResponsiveness: 1.4
-  wallPushBoost: 1.2
-  minImpactSpeedForKick: 1.5
-  wallImpactKickStrength: 1.6
-  icosahedronRigidbody: {fileID: 773711801}
-  moveActionReference: {fileID: 0}
+  _moveSpeed: 6
+  _acceleration: 30
+  _cameraTransform: {fileID: 330585546}
+  _gravityMultiplier: 2.5
+  _groundStickStrength: 20
+  _airControl: 1
+  _minWalkableNormalY: 0.55
+  _maxClimbHeight: -1.8
+  _minRollSlopeAngle: 10
+  _maxRollSlopeAngle: 35
+  _heightTorqueMultiplier: 0.5
+  _rollResponsiveness: 1.4
+  _wallPushBoost: 1.2
+  _minImpactSpeedForKick: 1.5
+  _wallImpactKickStrength: 1.6
+  _icosahedronRigidbody: {fileID: 773711801}
+  _moveActionReference: {fileID: 0}
 --- !u!54 &1436080024
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -6371,8 +6426,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 50f7766274cc4accac6fd46bd1e6c697, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.HoldButton
-  directionVector: {x: 1, y: 0}
-  controller: {fileID: 773711800}
+  _directionVector: {x: 1, y: 0}
+  _controller: {fileID: 773711800}
 --- !u!114 &1462213751
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -8276,14 +8331,14 @@ Transform:
   m_Children: []
   m_Father: {fileID: 773711805}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!64 &1835214254
-MeshCollider:
+--- !u!135 &1835214254
+SphereCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1835214252}
-  m_Material: {fileID: 13400000, guid: e97fee62faad4cf7a6a4868cde478650, type: 2}
+  m_Material: {fileID: 13400000, guid: d71a638a164f434a9497e096f9905f32, type: 2}
   m_IncludeLayers:
     serializedVersion: 2
     m_Bits: 0
@@ -8294,10 +8349,9 @@ MeshCollider:
   m_IsTrigger: 0
   m_ProvidesContacts: 0
   m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 1
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 2078444866}
+  serializedVersion: 3
+  m_Radius: 6.424
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &1841600740
 GameObject:
   m_ObjectHideFlags: 0
@@ -9253,184 +9307,6 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!43 &2078444866
-Mesh:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: IcosahedronExteriorMesh
-  serializedVersion: 12
-  m_SubMeshes:
-  - serializedVersion: 2
-    firstByte: 0
-    indexCount: 60
-    topology: 0
-    baseVertex: 0
-    firstVertex: 0
-    vertexCount: 12
-    localAABB:
-      m_Center: {x: 0, y: 0, z: 0}
-      m_Extent: {x: 7.844066, y: 6.396969, z: 7.291324}
-  m_Shapes:
-    vertices: []
-    shapes: []
-    channels: []
-    fullWeights: []
-  m_BindPose: []
-  m_BoneNameHashes: 
-  m_RootBoneNameHash: 0
-  m_BonesAABB: []
-  m_VariableBoneCountWeights:
-    m_Data: 
-  m_MeshCompression: 0
-  m_IsReadable: 1
-  m_KeepVertices: 1
-  m_KeepIndices: 1
-  m_IndexFormat: 0
-  m_IndexBuffer: 00000b000500000005000100000001000700000007000a0000000a000b0001000500090005000b0004000b000a0002000a0007000600070001000800030009000400030004000200030002000600030006000800030008000900040009000500020004000b00060002000a00080006000700090008000100
-  m_VertexData:
-    serializedVersion: 3
-    m_VertexCount: 12
-    m_Channels:
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 3
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    - stream: 0
-      offset: 0
-      format: 0
-      dimension: 0
-    m_DataSize: 144
-    _typelessdata: fe219bc0f8b3ccc0bda21d3fbdc943c09b4bc1bf8752e940bdc943409b4bc13f8752e9c0fe219b40f8b3cc40bda21dbf9702fb40994bc1bf590f7fbf0b433d40f8b3ccc04efe78400b433dc0f8b3cc404efe78c09702fbc0994bc13f590f7f3fde01f2bff8b3cc4080339040b81d9940964bc13f9d70c940b81d99c0964bc1bf9d70c9c0de01f23ff8b3ccc0803390c0
-  m_CompressedMesh:
-    m_Vertices:
-      m_NumItems: 0
-      m_Range: 0
-      m_Start: 0
-      m_Data: 
-      m_BitSize: 0
-    m_UV:
-      m_NumItems: 0
-      m_Range: 0
-      m_Start: 0
-      m_Data: 
-      m_BitSize: 0
-    m_Normals:
-      m_NumItems: 0
-      m_Range: 0
-      m_Start: 0
-      m_Data: 
-      m_BitSize: 0
-    m_Tangents:
-      m_NumItems: 0
-      m_Range: 0
-      m_Start: 0
-      m_Data: 
-      m_BitSize: 0
-    m_Weights:
-      m_NumItems: 0
-      m_Data: 
-      m_BitSize: 0
-    m_NormalSigns:
-      m_NumItems: 0
-      m_Data: 
-      m_BitSize: 0
-    m_TangentSigns:
-      m_NumItems: 0
-      m_Data: 
-      m_BitSize: 0
-    m_FloatColors:
-      m_NumItems: 0
-      m_Range: 0
-      m_Start: 0
-      m_Data: 
-      m_BitSize: 0
-    m_BoneIndices:
-      m_NumItems: 0
-      m_Data: 
-      m_BitSize: 0
-    m_Triangles:
-      m_NumItems: 0
-      m_Data: 
-      m_BitSize: 0
-    m_UVInfo: 0
-  m_LocalAABB:
-    m_Center: {x: 0, y: 0, z: 0}
-    m_Extent: {x: 7.844066, y: 6.396969, z: 7.291324}
-  m_MeshUsageFlags: 0
-  m_CookingOptions: 30
-  m_BakedConvexCollisionMesh: 
-  m_BakedTriangleCollisionMesh: 
-  'm_MeshMetrics[0]': 1
-  'm_MeshMetrics[1]': 1
-  m_MeshOptimizationFlags: 1
-  m_StreamData:
-    serializedVersion: 2
-    offset: 0
-    size: 0
-    path: 
-  m_MeshLodInfo:
-    serializedVersion: 2
-    m_LodSelectionCurve:
-      serializedVersion: 1
-      m_LodSlope: 0
-      m_LodBias: 0
-    m_NumLevels: 1
-    m_SubMeshes:
-    - serializedVersion: 2
-      m_Levels:
-      - serializedVersion: 1
-        m_IndexStart: 0
-        m_IndexCount: 0
 --- !u!1 &2103731919
 GameObject:
   m_ObjectHideFlags: 0
@@ -9821,59 +9697,6 @@ Mesh:
       - serializedVersion: 1
         m_IndexStart: 0
         m_IndexCount: 0
---- !u!1 &888880001
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 888880002}
-  - component: {fileID: 888880003}
-  m_Layer: 0
-  m_Name: GameLifetimeScope
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &888880002
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 888880001}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &888880003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 888880001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LuckyNumbers.PhysicsPrototype.GameLifetimeScope
-  parentReference:
-    type: 0
-    scope: {fileID: 0}
-  autoRun: 1
-  autoInjectGameObjects: []
-  _icosahedronController: {fileID: 773711800}
-  _playerController: {fileID: 1436080023}
-  _cameraController: {fileID: 330585548}
-  _debugRotationUI: {fileID: 773419483}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

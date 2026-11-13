@@ -432,9 +432,9 @@ namespace LuckyNumbers.PhysicsPrototype
                         baseDrive = angleFactor + wallPushFactor;
                     }
 
-                    if (_moveInput.sqrMagnitude > 0.1f && (_icoController.CurrentTiltAngle > 4.0f || _isPushingWall))
+                    if (_moveInput.sqrMagnitude > 0.05f)
                     {
-                        baseDrive = Mathf.Max(baseDrive, 0.55f);
+                        baseDrive = Mathf.Max(baseDrive, 0.50f * _moveInput.magnitude);
                     }
 
                     float lowestFloorY = _icoController.LowestInteriorFloorY;

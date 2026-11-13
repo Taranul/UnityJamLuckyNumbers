@@ -70,7 +70,7 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private float _settleDamping = 7.5f;
 
         [FormerlySerializedAs("flatAngleThreshold")]
-        [SerializeField] private float _flatAngleThreshold = 3.0f;
+        [SerializeField] private float _flatAngleThreshold = 6.0f;
 
         [Header("Debug Rotation Controls")]
         [FormerlySerializedAs("enableKeyboardDebug")]
@@ -127,6 +127,11 @@ namespace LuckyNumbers.PhysicsPrototype
             IsRestingFlat = _isGroundedOnTable;
 
             ConfigureRigidbody();
+
+            if (_isGroundedOnTable && IsRestingFlat && _targetRigidbody != null)
+            {
+                _targetRigidbody.isKinematic = true;
+            }
         }
 
         private void OnValidate()
@@ -146,6 +151,12 @@ namespace LuckyNumbers.PhysicsPrototype
         {
             if (_targetRigidbody == null) return;
 
+            if (_targetRigidbody.mass < 1000f)
+            {
+                _targetRigidbody.mass = 50000f;
+            }
+
+            _targetRigidbody.centerOfMass = Vector3.zero;
             _targetRigidbody.angularDamping = _angularDamping;
             _targetRigidbody.maxAngularVelocity = _maxAngularVelocity;
             _targetRigidbody.interpolation = RigidbodyInterpolation.Interpolate;
@@ -263,7 +274,7 @@ namespace LuckyNumbers.PhysicsPrototype
 
             CurrentTiltAngle = Mathf.Acos(Mathf.Clamp(maxBottomDot, -1f, 1f)) * Mathf.Rad2Deg;
 
-            bool nowFlat = _isGroundedOnTable && CurrentTiltAngle < _flatAngleThreshold && _currentRollAngularVel.sqrMagnitude < 0.05f;
+            bool nowFlat = _isGroundedOnTable && !_isPlayerRolling && CurrentTiltAngle < _flatAngleThreshold && _currentRollAngularVel.sqrMagnitude < 0.05f;
 
             if (!_wasRestingFlat && nowFlat)
             {
@@ -277,6 +288,13 @@ namespace LuckyNumbers.PhysicsPrototype
             {
                 TargetTopFaceNumber = CurrentTopFaceNumber;
                 TargetBottomFaceNumber = CurrentBottomFaceNumber;
+
+                if (_targetRigidbody != null && !_targetRigidbody.isKinematic && !_isPlayerRolling)
+                {
+                    _targetRigidbody.linearVelocity = Vector3.zero;
+                    _targetRigidbody.angularVelocity = Vector3.zero;
+                    _targetRigidbody.isKinematic = true;
+                }
             }
         }
 
@@ -340,6 +358,12 @@ namespace LuckyNumbers.PhysicsPrototype
 
             if (isActivelyRolling)
             {
+                if (_targetRigidbody.isKinematic)
+                {
+                    _targetRigidbody.isKinematic = false;
+                }
+                IsRestingFlat = false;
+
                 Vector3 targetRollVel = desiredRollAxis * desiredRollSpeed;
                 float dot = (_currentRollAngularVel.sqrMagnitude > 0.001f)
                     ? Vector3.Dot(_currentRollAngularVel.normalized, desiredRollAxis)
@@ -358,25 +382,19 @@ namespace LuckyNumbers.PhysicsPrototype
             }
             else
             {
-                float currentSpeed = _currentRollAngularVel.magnitude;
-                if (currentSpeed > 0.01f)
-                {
-                    Vector3 currentAxis = _currentRollAngularVel / currentSpeed;
-                    float coastedSpeed = Mathf.MoveTowards(currentSpeed, 0f, _coastFriction * dt);
-                    _currentRollAngularVel = currentAxis * coastedSpeed;
-                }
-                else
-                {
-                    _currentRollAngularVel = Vector3.zero;
-                }
+                float brakeSpeed = Mathf.Max(4f, _coastFriction * 1.5f);
+                _currentRollAngularVel = Vector3.MoveTowards(_currentRollAngularVel, Vector3.zero, brakeSpeed * dt);
 
-                if (_isGroundedOnTable && _enableTableRestingStability && _canonicalFaceNormals != null && _canonicalFaceNormals.Length > 0 && currentSpeed < 0.8f)
+                if (_isGroundedOnTable && _enableTableRestingStability && !IsRestingFlat && _currentRollAngularVel.magnitude < 0.8f)
                 {
                     ApplyTableRestingStability(dt);
                 }
             }
 
-            _targetRigidbody.angularVelocity = _currentRollAngularVel;
+            if (IsRestingFlat && !isActivelyRolling)
+            {
+                _currentRollAngularVel = Vector3.zero;
+            }
 
             if (_enableWorldTravel)
             {
@@ -384,40 +402,73 @@ namespace LuckyNumbers.PhysicsPrototype
                 float dynamicRadius = ComputeLowestPointOffset();
 
                 float targetY = (_rollMode == RollMode.SmoothCenterRoll)
-                    ? _tableFloorY + Mathf.Lerp(_outerFaceRadius, dynamicRadius, 0.25f)
+                    ? _tableFloorY + _outerFaceRadius
                     : _tableFloorY + dynamicRadius;
 
                 float currentY = transform.position.y;
                 _isGroundedOnTable = currentY <= (targetY + 0.15f);
 
-                float yVel;
                 if (!_isGroundedOnTable)
                 {
-                    yVel = _targetRigidbody.linearVelocity.y;
-                }
-                else
-                {
-                    float heightDiff = targetY - currentY;
-                    float surfaceYVel = heightDiff * 12.0f;
-                    yVel = Mathf.MoveTowards(_targetRigidbody.linearVelocity.y, surfaceYVel, 60.0f * dt);
-                    if (currentY < targetY)
+                    if (_targetRigidbody.isKinematic)
                     {
-                        yVel = Mathf.Max(yVel, surfaceYVel);
+                        _targetRigidbody.isKinematic = false;
                     }
+                    IsRestingFlat = false;
                 }
 
-                if (isActivelyRolling || _currentRollAngularVel.sqrMagnitude > 0.01f)
+                if (_targetRigidbody.isKinematic)
                 {
-                    _targetRigidbody.linearVelocity = new Vector3(rollLinearVel.x, yVel, rollLinearVel.z);
+                    CurrentTravelVelocity = Vector3.zero;
                 }
                 else
                 {
-                    Vector3 horizVel = new Vector3(_targetRigidbody.linearVelocity.x, 0f, _targetRigidbody.linearVelocity.z);
-                    Vector3 dampedHoriz = _isGroundedOnTable ? Vector3.MoveTowards(horizVel, Vector3.zero, 15f * dt) : horizVel;
-                    _targetRigidbody.linearVelocity = new Vector3(dampedHoriz.x, yVel, dampedHoriz.z);
-                }
+                    float yVel;
+                    if (!_isGroundedOnTable)
+                    {
+                        yVel = _targetRigidbody.linearVelocity.y;
+                    }
+                    else
+                    {
+                        float heightDiff = targetY - currentY;
+                        float surfaceYVel = heightDiff * 12.0f;
+                        yVel = Mathf.MoveTowards(_targetRigidbody.linearVelocity.y, surfaceYVel, 60.0f * dt);
+                        if (currentY < targetY)
+                        {
+                            yVel = Mathf.Max(yVel, surfaceYVel);
+                        }
+                    }
 
-                CurrentTravelVelocity = _targetRigidbody.linearVelocity;
+                    if (isActivelyRolling)
+                    {
+                        _targetRigidbody.linearVelocity = new Vector3(rollLinearVel.x, yVel, rollLinearVel.z);
+                    }
+                    else
+                    {
+                        Vector3 horizVel = new Vector3(_targetRigidbody.linearVelocity.x, 0f, _targetRigidbody.linearVelocity.z);
+                        Vector3 dampedHoriz;
+                        if (_isGroundedOnTable)
+                        {
+                            if (IsRestingFlat || horizVel.sqrMagnitude < 0.04f)
+                            {
+                                dampedHoriz = Vector3.zero;
+                            }
+                            else
+                            {
+                                dampedHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, 60f * dt);
+                            }
+                        }
+                        else
+                        {
+                            dampedHoriz = horizVel;
+                        }
+
+                        _targetRigidbody.linearVelocity = new Vector3(dampedHoriz.x, yVel, dampedHoriz.z);
+                    }
+
+                    _targetRigidbody.angularVelocity = _currentRollAngularVel;
+                    CurrentTravelVelocity = _targetRigidbody.linearVelocity;
+                }
             }
         }
 
@@ -453,6 +504,8 @@ namespace LuckyNumbers.PhysicsPrototype
 
         private void ApplyTableRestingStability(float dt)
         {
+            if (_canonicalFaceNormals == null || _canonicalFaceNormals.Length == 0) return;
+
             Vector3 bestNormal = Vector3.down;
             float maxDot = -1f;
 
@@ -467,32 +520,41 @@ namespace LuckyNumbers.PhysicsPrototype
                 }
             }
 
-            Vector3 errorAxis = Vector3.Cross(bestNormal, Vector3.down);
-            float errorMagnitude = errorAxis.magnitude;
+            Quaternion alignRot = Quaternion.FromToRotation(bestNormal, Vector3.down);
+            Quaternion targetRotation = alignRot * transform.rotation;
 
-            if (errorMagnitude < 0.0001f)
+            float currentTilt = CurrentTiltAngle;
+            float settleSpeed = Mathf.Clamp(_settleStiffness * 2.5f, 25f, 75f) + _settleDamping;
+
+            if (currentTilt < _flatAngleThreshold)
             {
-                _currentRollAngularVel = Vector3.MoveTowards(_currentRollAngularVel, Vector3.zero, 15f * dt);
-                return;
+                Quaternion nextRot = Quaternion.RotateTowards(transform.rotation, targetRotation, (settleSpeed + 15f) * dt);
+                if (_targetRigidbody != null && !_targetRigidbody.isKinematic) _targetRigidbody.MoveRotation(nextRot);
+                else transform.rotation = nextRot;
+                _currentRollAngularVel = Vector3.zero;
+
+                if (currentTilt < 0.8f)
+                {
+                    if (_targetRigidbody != null && !_targetRigidbody.isKinematic) _targetRigidbody.MoveRotation(targetRotation);
+                    else transform.rotation = targetRotation;
+                    IsRestingFlat = true;
+                    _wasRestingFlat = true;
+                    OnFaceLanded?.Invoke(CurrentTopFaceNumber);
+
+                    if (_targetRigidbody != null && !_targetRigidbody.isKinematic)
+                    {
+                        _targetRigidbody.linearVelocity = Vector3.zero;
+                        _targetRigidbody.angularVelocity = Vector3.zero;
+                        _targetRigidbody.isKinematic = true;
+                    }
+                }
             }
-
-            float errorAngleRad = Mathf.Asin(Mathf.Clamp01(errorMagnitude));
-            Vector3 errorDir = errorAxis / errorMagnitude;
-
-            float stiffness = _settleStiffness;
-            if (CurrentTiltAngle > 20.9f)
+            else
             {
-                stiffness *= 1.3f;
-            }
-
-            Vector3 targetSettleVel = errorDir * (errorAngleRad * stiffness);
-            targetSettleVel = Vector3.ClampMagnitude(targetSettleVel, 2.0f);
-
-            _currentRollAngularVel = Vector3.MoveTowards(_currentRollAngularVel, targetSettleVel, _settleDamping * dt);
-
-            if (errorAngleRad < (_flatAngleThreshold * Mathf.Deg2Rad) && _currentRollAngularVel.magnitude < 0.35f)
-            {
-                _currentRollAngularVel = Vector3.MoveTowards(_currentRollAngularVel, Vector3.zero, 20f * dt);
+                Quaternion nextRot = Quaternion.RotateTowards(transform.rotation, targetRotation, settleSpeed * dt);
+                if (_targetRigidbody != null && !_targetRigidbody.isKinematic) _targetRigidbody.MoveRotation(nextRot);
+                else transform.rotation = nextRot;
+                _currentRollAngularVel = Vector3.zero;
             }
         }
     }

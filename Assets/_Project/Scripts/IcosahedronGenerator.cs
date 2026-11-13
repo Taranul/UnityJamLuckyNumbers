@@ -18,6 +18,10 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private Material exteriorMaterial;
         [SerializeField] private Material edgeMaterial;
         [SerializeField] private PhysicsMaterial interiorPhysicMaterial;
+        [SerializeField] private PhysicsMaterial exteriorPhysicMaterial;
+        [Header("Exterior Collision")]
+        [SerializeField] private bool useSphericalExteriorCollider = true;
+        [SerializeField] private float sphericalColliderRadius = 6.424f;
 
         [Header("DnD Visual Features")]
         [SerializeField] private bool showDndNumbers = true;
@@ -328,35 +332,50 @@ namespace LuckyNumbers.PhysicsPrototype
             if (layer < 0) layer = 9;
             exteriorObj.layer = layer;
 
-            float rOut = innerRadius + wallThickness;
-            Vector3[] verts = new Vector3[12];
-            for (int i = 0; i < 12; i++)
+            PhysicsMaterial extMat = exteriorPhysicMaterial != null ? exteriorPhysicMaterial : interiorPhysicMaterial;
+
+            if (useSphericalExteriorCollider)
             {
-                verts[i] = unitVertices[i] * rOut;
+                SphereCollider sc = exteriorObj.AddComponent<SphereCollider>();
+                sc.radius = sphericalColliderRadius > 0.01f ? sphericalColliderRadius : (innerRadius * 0.7557613f + wallThickness);
+                if (extMat != null)
+                {
+                    sc.material = extMat;
+                }
             }
-
-            int[] indices = new int[60];
-            for (int f = 0; f < 20; f++)
+            else
             {
-                indices[f * 3 + 0] = faces[f][0];
-                indices[f * 3 + 1] = faces[f][1];
-                indices[f * 3 + 2] = faces[f][2];
-            }
+                float rOut = innerRadius + wallThickness;
+                Vector3[] verts = new Vector3[12];
+                for (int i = 0; i < 12; i++)
+                {
+                    verts[i] = unitVertices[i] * rOut;
+                }
 
-            Mesh exteriorMesh = new Mesh();
-            exteriorMesh.name = "IcosahedronExteriorMesh";
-            exteriorMesh.vertices = verts;
-            exteriorMesh.triangles = indices;
-            exteriorMesh.RecalculateBounds();
+                int[] indices = new int[60];
+                for (int f = 0; f < 20; f++)
+                {
+                    indices[f * 3 + 0] = faces[f][0];
+                    indices[f * 3 + 1] = faces[f][1];
+                    indices[f * 3 + 2] = faces[f][2];
+                }
 
-            MeshCollider mc = exteriorObj.AddComponent<MeshCollider>();
-            mc.sharedMesh = exteriorMesh;
-            mc.convex = true;
-            if (interiorPhysicMaterial != null)
-            {
-                mc.material = interiorPhysicMaterial;
+                Mesh exteriorMesh = new Mesh();
+                exteriorMesh.name = "IcosahedronExteriorMesh";
+                exteriorMesh.vertices = verts;
+                exteriorMesh.triangles = indices;
+                exteriorMesh.RecalculateBounds();
+
+                MeshCollider mc = exteriorObj.AddComponent<MeshCollider>();
+                mc.sharedMesh = exteriorMesh;
+                mc.convex = true;
+                if (extMat != null)
+                {
+                    mc.material = extMat;
+                }
             }
         }
+
 
         private void SetupInteriorColliders(Vector3[] unitVertices, int[][] faces)
         {
