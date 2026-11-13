@@ -71,7 +71,7 @@ namespace LuckyNumbers.PhysicsPrototype
         private Vector2 _moveInput;
         private Vector3 _desiredDirection = Vector3.zero;
         private float _lastIcoContactTime = -100f;
-        private bool _isGroundedOnIcosahedron = false;
+        private float _lastGroundedTime = -100f;
         private Vector3 _groundNormal = Vector3.up;
         private Vector3 _floorNormal = Vector3.up;
         private bool _hasFloorContact = false;
@@ -199,6 +199,10 @@ namespace LuckyNumbers.PhysicsPrototype
             }
 
             _moveInput = Vector2.ClampMagnitude(_moveInput, 1.0f);
+            if (_moveInput.sqrMagnitude < 0.0025f) // Small deadzone (0.05 magnitude) to prevent stick drift
+            {
+                _moveInput = Vector2.zero;
+            }
         }
 
         private void FixedUpdate()
@@ -217,7 +221,8 @@ namespace LuckyNumbers.PhysicsPrototype
             _desiredDirection = (camForward * _moveInput.y + camRight * _moveInput.x).normalized;
 
             bool isContacting = (Time.time - _lastIcoContactTime) < (Time.fixedDeltaTime * 2.5f);
-            bool isWalkableSlope = _isGroundedOnIcosahedron && (_floorNormal.y >= minWalkableNormalY);
+            bool isGrounded = (Time.time - _lastGroundedTime) < (Time.fixedDeltaTime * 2.5f);
+            bool isWalkableSlope = isGrounded && (_floorNormal.y >= minWalkableNormalY);
 
             Vector3 currentVelocity = _rigidbody.linearVelocity;
             Vector3 currentHorizontalVel = new Vector3(currentVelocity.x, 0f, currentVelocity.z);
@@ -234,10 +239,9 @@ namespace LuckyNumbers.PhysicsPrototype
             // --- 2. Ground Snapping & Anti-Launch Adhesion ---
             if (isContacting && isWalkableSlope)
             {
-                // Firm downward adhesion strictly along the floor support normal or downward.
-                // NEVER pulls horizontally into a wall or corner crevice!
-                Vector3 stickDir = (_floorNormal.y > 0.7f) ? Vector3.down : -_floorNormal;
-                _rigidbody.AddForce(stickDir * groundStickStrength, ForceMode.Acceleration);
+                // Firm downward adhesion strictly along the floor support normal (-_floorNormal).
+                // Perpendicular to the surface: holds feet firmly planted with zero downhill/horizontal component!
+                _rigidbody.AddForce(-_floorNormal * groundStickStrength, ForceMode.Acceleration);
 
                 // Anti-launch: cancel ONLY upward lift away from the floor.
                 // NEVER strips horizontal escape velocity when moving out of a corner!
@@ -252,20 +256,55 @@ namespace LuckyNumbers.PhysicsPrototype
                 }
             }
 
-            // --- 3. Decoupled Locomotion with Soap-Like Corner Deflection ---
+            // --- 3. Decoupled Locomotion & Authoritative Braking ---
+            Vector3 surfaceVel = (icosahedronRigidbody != null) 
+                ? icosahedronRigidbody.GetPointVelocity(transform.position) 
+                : Vector3.zero;
+
             Vector3 icoHorizVel = (icosahedronRigidbody != null) 
                 ? new Vector3(icosahedronRigidbody.linearVelocity.x, 0f, icosahedronRigidbody.linearVelocity.z) 
                 : Vector3.zero;
 
-            if (_moveInput.sqrMagnitude < 0.01f)
+            if (_moveInput.sqrMagnitude < 0.001f)
             {
-                // Active surface braking when idle: quickly extinguishes relative drift to stay planted with moving floor
                 if (isContacting)
                 {
-                    Vector3 relativeVel = currentVelocity - (icosahedronRigidbody != null ? icosahedronRigidbody.linearVelocity : Vector3.zero);
-                    Vector3 relativeHorizVel = new Vector3(relativeVel.x, 0f, relativeVel.z);
-                    Vector3 brakeForce = -relativeHorizVel * (acceleration * 2.0f);
-                    _rigidbody.AddForce(brakeForce, ForceMode.Acceleration);
+                    Vector3 relativeVel = currentVelocity - surfaceVel;
+
+                    if (isWalkableSlope)
+                    {
+                        // Counteract downhill gravity component to hold position completely stationary on slopes when idle
+                        Vector3 totalGravityAcc = Physics.gravity * gravityMultiplier;
+                        Vector3 downhillGravity = Vector3.ProjectOnPlane(totalGravityAcc, _floorNormal);
+                        _rigidbody.AddForce(-downhillGravity, ForceMode.Acceleration);
+
+                        // Direct snappy braking: bring relative velocity quickly to zero
+                        float brakeRate = acceleration * 3.5f; // ~105 m/s²
+                        Vector3 newRelativeVel = Vector3.MoveTowards(relativeVel, Vector3.zero, brakeRate * Time.fixedDeltaTime);
+
+                        // Complete dead-stop snap threshold: eliminate residual micro-drift
+                        if (newRelativeVel.sqrMagnitude < 0.04f) // < 0.2 m/s
+                        {
+                            newRelativeVel = Vector3.zero;
+                        }
+
+                        _rigidbody.linearVelocity = surfaceVel + newRelativeVel;
+                    }
+                    else
+                    {
+                        // On steep walls / ceiling: brake horizontal velocity relative to surface,
+                        // while allowing gravity to pull player down to the floor
+                        Vector3 relHoriz = new Vector3(relativeVel.x, 0f, relativeVel.z);
+                        Vector3 newRelHoriz = Vector3.MoveTowards(relHoriz, Vector3.zero, acceleration * 3.0f * Time.fixedDeltaTime);
+                        _rigidbody.linearVelocity = new Vector3(surfaceVel.x + newRelHoriz.x, currentVelocity.y, surfaceVel.z + newRelHoriz.z);
+                    }
+                }
+                else
+                {
+                    // Airborne with no input: damp horizontal drift relative to die center
+                    Vector3 relAirHoriz = currentHorizontalVel - icoHorizVel;
+                    Vector3 dampedAir = Vector3.MoveTowards(relAirHoriz, Vector3.zero, 15.0f * Time.fixedDeltaTime);
+                    _rigidbody.linearVelocity = new Vector3(icoHorizVel.x + dampedAir.x, currentVelocity.y, icoHorizVel.z + dampedAir.z);
                 }
             }
             else
@@ -478,7 +517,6 @@ namespace LuckyNumbers.PhysicsPrototype
             if (otherRb != icosahedronRigidbody) return;
 
             _lastIcoContactTime = Time.time;
-            _isGroundedOnIcosahedron = false;
             _hasFloorContact = false;
             _wallNormals.Clear();
 
@@ -493,7 +531,7 @@ namespace LuckyNumbers.PhysicsPrototype
                 // Support surface under feet (floor): normal.y >= 0.50f
                 if (contact.normal.y >= 0.50f)
                 {
-                    _isGroundedOnIcosahedron = true;
+                    _lastGroundedTime = Time.time;
                     if (contact.normal.y > bestFloorY)
                     {
                         bestFloorY = contact.normal.y;
