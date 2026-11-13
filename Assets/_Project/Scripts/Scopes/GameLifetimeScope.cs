@@ -13,7 +13,6 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private IcosahedronController _icosahedronController;
         [SerializeField] private PlayerController _playerController;
         [SerializeField] private CameraController _cameraController;
-        [SerializeField] private DebugRotationUI _debugRotationUI;
 
         protected override void Configure(IContainerBuilder builder)
         {
@@ -42,15 +41,6 @@ namespace LuckyNumbers.PhysicsPrototype
             else
             {
                 builder.RegisterComponentInHierarchy<CameraController>();
-            }
-
-            if (_debugRotationUI != null)
-            {
-                builder.RegisterComponent(_debugRotationUI);
-            }
-            else
-            {
-                builder.RegisterComponentInHierarchy<DebugRotationUI>();
             }
         }
     }

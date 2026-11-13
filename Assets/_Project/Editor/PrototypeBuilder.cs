@@ -132,19 +132,6 @@ namespace LuckyNumbers.PhysicsPrototype.Editor
                 }
             }
 
-            GameObject uiCanvasObj = GameObject.Find("DebugRotationUI");
-            if (uiCanvasObj == null)
-            {
-                uiCanvasObj = new GameObject("DebugRotationUI");
-            }
-
-            DebugRotationUI debugUI = uiCanvasObj.GetComponent<DebugRotationUI>();
-            if (debugUI == null)
-            {
-                debugUI = uiCanvasObj.AddComponent<DebugRotationUI>();
-                debugUI.BuildUI();
-            }
-
             GameObject scopeObj = GameObject.Find("GameLifetimeScope");
             if (scopeObj == null)
             {

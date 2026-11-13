@@ -1,19 +1,12 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 namespace LuckyNumbers.PhysicsPrototype
 {
-    public enum RollMode
-    {
-        SmoothCenterRoll,
-        EdgePivotTumble
-    }
-
     /// <summary>
-    /// Controls the physical rotation, vector momentum, settling, and world travel of the icosahedron die.
+    /// Controls the smooth arcade physical rolling, settling, and parabolic toss mechanics of the icosahedron die.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class IcosahedronController : MonoBehaviour
@@ -41,12 +34,9 @@ namespace LuckyNumbers.PhysicsPrototype
         [SerializeField] private float _angularDamping = 1.5f;
 
         [FormerlySerializedAs("maxAngularVelocity")]
-        [SerializeField] private float _maxAngularVelocity = 6.0f;
+        [SerializeField] private float _maxAngularVelocity = 25.0f;
 
         [Header("Rolling & World Movement")]
-        [FormerlySerializedAs("rollMode")]
-        [SerializeField] private RollMode _rollMode = RollMode.SmoothCenterRoll;
-
         [FormerlySerializedAs("enableWorldTravel")]
         [SerializeField] private bool _enableWorldTravel = true;
 
@@ -72,14 +62,40 @@ namespace LuckyNumbers.PhysicsPrototype
         [FormerlySerializedAs("flatAngleThreshold")]
         [SerializeField] private float _flatAngleThreshold = 6.0f;
 
-        [Header("Debug Rotation Controls")]
-        [FormerlySerializedAs("enableKeyboardDebug")]
-        [SerializeField] private bool _enableKeyboardDebug = true;
+        [Header("Parabolic Toss / Launch")]
+        [SerializeField] private bool _enableKeyToss = true;
+        [SerializeField] private Key _tossKey = Key.Space;
 
-        [FormerlySerializedAs("debugRotationSpeed")]
-        [SerializeField] private float _debugRotationSpeed = 2.5f;
+        [Tooltip("Base upward speed of the parabolic launch (m/s).")]
+        [SerializeField] private float _tossUpwardSpeed = 18.0f;
 
-        public RollMode CurrentRollMode => _rollMode;
+        [Tooltip("Base horizontal speed of the parabolic launch (m/s).")]
+        [SerializeField] private float _tossForwardSpeed = 8.0f;
+
+        [Tooltip("Base horizontal launch direction. If (0,0,0), uses current travel direction or transform forward.")]
+        [SerializeField] private Vector3 _tossDirection = Vector3.forward;
+
+        [Tooltip("If true, launches in the current rolling direction rather than static toss direction when in motion.")]
+        [SerializeField] private bool _useCurrentTravelDirection = true;
+
+        [Tooltip("Maximum random horizontal deviation angle (in degrees) from the toss direction.")]
+        [Range(0f, 180f)]
+        [SerializeField] private float _tossHorizontalDeviationAngle = 30.0f;
+
+        [Tooltip("Random percentage variation in toss speed (+-). E.g. 0.15 = +-15%.")]
+        [Range(0f, 0.5f)]
+        [SerializeField] private float _tossSpeedRandomVariation = 0.15f;
+
+        [Header("Random Powerful Torque")]
+        [Tooltip("Minimum random angular velocity applied during toss (rad/s).")]
+        [SerializeField] private float _minTossTorqueSpeed = 8.0f;
+
+        [Tooltip("Maximum random angular velocity applied during toss (rad/s).")]
+        [SerializeField] private float _maxTossTorqueSpeed = 18.0f;
+
+        [Tooltip("Optional reference to interior player Rigidbody so both launch together smoothly.")]
+        [SerializeField] private Rigidbody _playerRigidbody;
+
         public Rigidbody TargetRigidbody => _targetRigidbody;
         public float LowestInteriorFloorY => transform.position.y - (_outerFaceRadius - 0.5f);
         public Vector3 CurrentTravelVelocity { get; private set; } = Vector3.zero;
@@ -108,7 +124,6 @@ namespace LuckyNumbers.PhysicsPrototype
         private float _playerRollSpeed;
         private bool _wasRestingFlat = true;
         private bool _isGroundedOnTable = true;
-        private readonly HashSet<Vector2> _activePointerDirections = new HashSet<Vector2>();
 
         private void Awake()
         {
@@ -125,6 +140,15 @@ namespace LuckyNumbers.PhysicsPrototype
             _isGroundedOnTable = transform.position.y <= (initialTargetY + 0.15f);
             _wasRestingFlat = _isGroundedOnTable;
             IsRestingFlat = _isGroundedOnTable;
+
+            if (_playerRigidbody == null)
+            {
+                PlayerController pc = FindFirstObjectByType<PlayerController>();
+                if (pc != null)
+                {
+                    _playerRigidbody = pc.GetComponent<Rigidbody>();
+                }
+            }
 
             ConfigureRigidbody();
 
@@ -167,6 +191,80 @@ namespace LuckyNumbers.PhysicsPrototype
         }
 
         /// <summary>
+        /// Shoots the die up into a parabolic trajectory with random deviation and powerful random torque.
+        /// </summary>
+        [ContextMenu("Toss Die")]
+        public void TossDie()
+        {
+            TossDieInternal();
+        }
+
+        /// <summary>
+        /// Shoots the die with customized launch parameters.
+        /// </summary>
+        public void TossDie(Vector3 customDirection, float upwardSpeed, float forwardSpeed)
+        {
+            TossDieInternal(customDirection, upwardSpeed, forwardSpeed);
+        }
+
+        private void TossDieInternal(Vector3? customDir = null, float? customUp = null, float? customForward = null)
+        {
+            if (_targetRigidbody == null) return;
+
+            if (_targetRigidbody.isKinematic)
+            {
+                _targetRigidbody.isKinematic = false;
+            }
+            IsRestingFlat = false;
+            _wasRestingFlat = false;
+            _isGroundedOnTable = false;
+            _isPlayerRolling = false;
+
+            Vector3 baseDir;
+            if (customDir.HasValue && customDir.Value.sqrMagnitude > 0.001f)
+            {
+                baseDir = customDir.Value.normalized;
+            }
+            else if (_useCurrentTravelDirection && CurrentTravelVelocity.sqrMagnitude > 0.1f)
+            {
+                baseDir = CurrentTravelVelocity.normalized;
+            }
+            else if (_tossDirection.sqrMagnitude > 0.001f)
+            {
+                baseDir = _tossDirection.normalized;
+            }
+            else
+            {
+                baseDir = transform.forward;
+            }
+
+            baseDir = Vector3.ProjectOnPlane(baseDir, Vector3.up).normalized;
+            if (baseDir.sqrMagnitude < 0.001f) baseDir = Vector3.forward;
+
+            float randomAngle = UnityEngine.Random.Range(-_tossHorizontalDeviationAngle, _tossHorizontalDeviationAngle);
+            Vector3 launchHorizDir = Quaternion.AngleAxis(randomAngle, Vector3.up) * baseDir;
+
+            float speedVariation = 1.0f + UnityEngine.Random.Range(-_tossSpeedRandomVariation, _tossSpeedRandomVariation);
+            float upSpeed = (customUp ?? _tossUpwardSpeed) * speedVariation;
+            float fwdSpeed = (customForward ?? _tossForwardSpeed) * speedVariation;
+
+            Vector3 launchVelocity = (launchHorizDir * fwdSpeed) + (Vector3.up * upSpeed);
+            _targetRigidbody.linearVelocity = launchVelocity;
+
+            if (_playerRigidbody != null)
+            {
+                _playerRigidbody.linearVelocity = launchVelocity;
+            }
+
+            Vector3 randomTorqueAxis = UnityEngine.Random.onUnitSphere;
+            float randomTorqueSpeed = UnityEngine.Random.Range(_minTossTorqueSpeed, _maxTossTorqueSpeed);
+            Vector3 launchAngularVel = randomTorqueAxis * randomTorqueSpeed;
+
+            _targetRigidbody.angularVelocity = launchAngularVel;
+            _currentRollAngularVel = launchAngularVel;
+        }
+
+        /// <summary>
         /// Drives die rotation around a world axis driven by player movement and climb effort.
         /// </summary>
         public void DriveRollFromPlayer(Vector3 worldRollAxis, float targetAngularSpeed, float effort, Vector3 movementDir)
@@ -198,16 +296,6 @@ namespace LuckyNumbers.PhysicsPrototype
             TargetBottomFaceNumber = CurrentBottomFaceNumber;
         }
 
-        public void ToggleRollMode()
-        {
-            _rollMode = (_rollMode == RollMode.SmoothCenterRoll) ? RollMode.EdgePivotTumble : RollMode.SmoothCenterRoll;
-        }
-
-        public void SetRollMode(RollMode mode)
-        {
-            _rollMode = mode;
-        }
-
         /// <summary>
         /// Applies an angular impulse kick when the player impacts an interior wall.
         /// </summary>
@@ -222,21 +310,20 @@ namespace LuckyNumbers.PhysicsPrototype
             }
         }
 
-        public void SetDirectionHeld(Vector2 direction, bool isHeld)
-        {
-            if (isHeld)
-            {
-                _activePointerDirections.Add(direction);
-            }
-            else
-            {
-                _activePointerDirections.Remove(direction);
-            }
-        }
-
         private void Update()
         {
             UpdateCurrentFaces();
+            HandleTossInput();
+        }
+
+        private void HandleTossInput()
+        {
+            if (!_enableKeyToss) return;
+            Keyboard kb = Keyboard.current;
+            if (kb != null && kb[_tossKey].wasPressedThisFrame)
+            {
+                TossDie();
+            }
         }
 
         private void UpdateCurrentFaces()
@@ -335,26 +422,9 @@ namespace LuckyNumbers.PhysicsPrototype
 
             float dt = Time.fixedDeltaTime;
 
-            Vector2 debugInput = GetDebugDirectionInput();
-            bool hasDebugInput = debugInput.sqrMagnitude > 0.01f;
-
-            bool isActivelyRolling = false;
-            Vector3 desiredRollAxis = Vector3.zero;
-            float desiredRollSpeed = 0f;
-
-            if (hasDebugInput)
-            {
-                Vector3 localRollAxis = new Vector3(debugInput.y, 0f, -debugInput.x).normalized;
-                desiredRollAxis = transform.TransformDirection(localRollAxis);
-                desiredRollSpeed = _debugRotationSpeed;
-                isActivelyRolling = true;
-            }
-            else if (_isPlayerRolling && _playerRollSpeed > 0.01f)
-            {
-                desiredRollAxis = _playerRollAxis;
-                desiredRollSpeed = _playerRollSpeed;
-                isActivelyRolling = true;
-            }
+            bool isActivelyRolling = _isPlayerRolling && _playerRollSpeed > 0.01f;
+            Vector3 desiredRollAxis = _playerRollAxis;
+            float desiredRollSpeed = _playerRollSpeed;
 
             if (isActivelyRolling)
             {
@@ -399,14 +469,11 @@ namespace LuckyNumbers.PhysicsPrototype
             if (_enableWorldTravel)
             {
                 Vector3 rollLinearVel = Vector3.Cross(_currentRollAngularVel, Vector3.up) * (_outerFaceRadius * _travelSpeedMultiplier);
-                float dynamicRadius = ComputeLowestPointOffset();
 
-                float targetY = (_rollMode == RollMode.SmoothCenterRoll)
-                    ? _tableFloorY + _outerFaceRadius
-                    : _tableFloorY + dynamicRadius;
-
+                float targetY = _tableFloorY + _outerFaceRadius;
                 float currentY = transform.position.y;
-                _isGroundedOnTable = currentY <= (targetY + 0.15f);
+                bool isFallingOrGrounded = _targetRigidbody.linearVelocity.y <= 0.1f;
+                _isGroundedOnTable = (currentY <= (targetY + 0.15f)) && isFallingOrGrounded;
 
                 if (!_isGroundedOnTable)
                 {
@@ -431,7 +498,7 @@ namespace LuckyNumbers.PhysicsPrototype
                     else
                     {
                         float heightDiff = targetY - currentY;
-                        float surfaceYVel = heightDiff * 12.0f;
+                        float surfaceYVel = heightDiff * 14.0f;
                         yVel = Mathf.MoveTowards(_targetRigidbody.linearVelocity.y, surfaceYVel, 60.0f * dt);
                         if (currentY < targetY)
                         {
@@ -439,67 +506,36 @@ namespace LuckyNumbers.PhysicsPrototype
                         }
                     }
 
-                    if (isActivelyRolling)
+                    if (!_isGroundedOnTable)
+                    {
+                        _currentRollAngularVel = _targetRigidbody.angularVelocity;
+                        CurrentTravelVelocity = _targetRigidbody.linearVelocity;
+                    }
+                    else if (isActivelyRolling)
                     {
                         _targetRigidbody.linearVelocity = new Vector3(rollLinearVel.x, yVel, rollLinearVel.z);
+                        _targetRigidbody.angularVelocity = _currentRollAngularVel;
+                        CurrentTravelVelocity = _targetRigidbody.linearVelocity;
                     }
                     else
                     {
                         Vector3 horizVel = new Vector3(_targetRigidbody.linearVelocity.x, 0f, _targetRigidbody.linearVelocity.z);
                         Vector3 dampedHoriz;
-                        if (_isGroundedOnTable)
+                        if (IsRestingFlat || horizVel.sqrMagnitude < 0.04f)
                         {
-                            if (IsRestingFlat || horizVel.sqrMagnitude < 0.04f)
-                            {
-                                dampedHoriz = Vector3.zero;
-                            }
-                            else
-                            {
-                                dampedHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, 60f * dt);
-                            }
+                            dampedHoriz = Vector3.zero;
                         }
                         else
                         {
-                            dampedHoriz = horizVel;
+                            dampedHoriz = Vector3.MoveTowards(horizVel, Vector3.zero, 60f * dt);
                         }
 
                         _targetRigidbody.linearVelocity = new Vector3(dampedHoriz.x, yVel, dampedHoriz.z);
+                        _targetRigidbody.angularVelocity = _currentRollAngularVel;
+                        CurrentTravelVelocity = _targetRigidbody.linearVelocity;
                     }
-
-                    _targetRigidbody.angularVelocity = _currentRollAngularVel;
-                    CurrentTravelVelocity = _targetRigidbody.linearVelocity;
                 }
             }
-        }
-
-        private float ComputeLowestPointOffset()
-        {
-            float tiltRad = CurrentTiltAngle * Mathf.Deg2Rad;
-            float cosTilt = Mathf.Max(0.72f, Mathf.Cos(tiltRad));
-            return _outerFaceRadius / cosTilt;
-        }
-
-        private Vector2 GetDebugDirectionInput()
-        {
-            Vector2 combined = Vector2.zero;
-            foreach (Vector2 dir in _activePointerDirections)
-            {
-                combined += dir;
-            }
-
-            if (_enableKeyboardDebug)
-            {
-                Keyboard kb = Keyboard.current;
-                if (kb != null)
-                {
-                    if (kb.upArrowKey.isPressed) combined.y += 1f;
-                    if (kb.downArrowKey.isPressed) combined.y -= 1f;
-                    if (kb.leftArrowKey.isPressed) combined.x -= 1f;
-                    if (kb.rightArrowKey.isPressed) combined.x += 1f;
-                }
-            }
-
-            return Vector2.ClampMagnitude(combined, 1f);
         }
 
         private void ApplyTableRestingStability(float dt)
